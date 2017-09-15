@@ -80,19 +80,19 @@ fv=zeros(lim,n);
 
 %% Analysis
 % (Parallel Loop)
+% This is the loop for the number of days
+for jjj = (1:lim)
 
-parfor jjj = 1:lim % This is the loop for the number of days
-    
     %Data for this iter
     Day = mod(jjj-1, lim) + 1;
     Bridge = floor(jjj, lim) + 1
-    
+
     if Temp == 1
         hour=0
     end
-    
+
     % CANNOT MODIFY BRIDGE DAMAGE WITHIN LOOP
-    
+
     % Rain bounds
     if RainEffects==1
         if jjj>=3
@@ -109,10 +109,10 @@ parfor jjj = 1:lim % This is the loop for the number of days
             end
         end
     end
-    
-    
-    for ii=1:n % This is the loop for changing vehicle variables over time
-        
+
+
+    parfor ii=1:n % This is the loop for changing vehicle variables over time
+        hour = Td(ii)
         % Temperature bounds
         if Temp==1
             TopHourTemp=(temperature(jjj,hour+2)-32)*5/9;
@@ -134,11 +134,11 @@ parfor jjj = 1:lim % This is the loop for the number of days
             u0=1;
             E0=E;
         end
-        
+
         % wn=sqrt((pi^4/L^4)*(E0*I/mu)); % First natural frequency modified by temperature
         % f1=wn/(2*pi); % First natural frequency in Hz
         % w2=sqrt((2^4*pi^4/L^4)*(E0*I/mu)); % Second natural frequency
-        
+
         % Wind loads
         if Wind==1
             ce=1.3; % Exposure factor (1.3 for normal structures)
@@ -154,7 +154,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
             % (add a guest factor that can turn on and off randomly, will only do this
             % for higher than normal wind speeds)
         end
-        
+
         % Applying damaged modulus to elemental matrix
         if Day>=DayDamage1
             if sum(ED1(1,1:(jjj-DayDamage1+1)))/E >= .4
@@ -164,7 +164,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
             end
             kb_damaged1=KBeam(E_damaged1*u0,I,l);
         end
-        
+
         if Day>=DayDamage2
             if sum(ED2(1,1:(jjj-DayDamage2+1)))/E >= .4
                 E_damaged2=E*.6;
@@ -173,11 +173,11 @@ parfor jjj = 1:lim % This is the loop for the number of days
             end
             kb_damaged2=KBeam(E_damaged2*u0,I,l);
         end
-        
+
         % Healthy elemental matrices
         kb=KBeam(E0,I,l); % Stiffness matrix for bridge
         mb=MBeam(mu,l); % Consistent mass matrix for bridge
-        
+
         % Vehicle parameters
         mv=VehicleVariables(row(jjj,ii),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 3 vehicles)
         if row(jjj,ii)==1
@@ -190,7 +190,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
         cs=VehicleVariables(row(jjj,ii),4); % Damping of vehicle spring N*s/m
         cw=VehicleVariables(row(jjj,ii),5); % Damping of vehicle tire N*s/m
         fv(jjj,ii)=sqrt(kv/mv)/(2*pi); % Natural frequency of sprung mass
-        
+
         %
         VehicleMass(jjj,ii)=VehicleVariables(row(jjj,ii),1);
         WheelMass(jjj,ii)=VehicleVariables(row(jjj,ii),2);
@@ -198,7 +198,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
         WheelStiffness(jjj,ii)=VehicleVariables(row(jjj,ii),6);
         SuspensionDamping(jjj,ii)=VehicleVariables(row(jjj,ii),4);
         WheelDamping(jjj,ii)=VehicleVariables(row(jjj,ii),5);
-        
+
         % Time and position
         dT=.001; % Time Step
         T=0:dT:L/V(jjj,ii); % Total time to cross bridge
@@ -206,7 +206,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
         xg=0; % Initial global position
         j=1; % Initial row for elemental matrix
         J=2; % Initial row for nodal matrix
-        
+
         % Road Surface Roughness
         % k=3; % A-B Roughness value
         % B=L/Kt ; % Sampling Interval (m)
@@ -216,9 +216,9 @@ parfor jjj = 1:lim % This is the loop for the number of days
         % x = 0:B:L-B; % Abscissa Variable from 0 to L
         % hx = zeros(size(x));
         %     hx(i) = sum(sqrt(dN)*(2^k)*(1e-3)*(n_o./n)*cos(2*pi*n*x(i)+ Pangle(1:Kt)));
-        
-        
-        
+
+
+
         %% Matricies and Initial Conditions
         % Beam Matricies
         KB=zeros(2*(NumberElements+1),2*(NumberElements+1));
@@ -235,7 +235,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
                         kk(:,:,i)=KInsert(kb_damaged1,cor(i,:),2*(NumberElements+1));
                     end
                 end
-                
+
                 if i==DamageLocation(2,1) % Insert damage state 2
                     if Day>=DayDamage2
                         kk(:,:,i)=KInsert(kb_damaged2,cor(i,:),2*(NumberElements+1));
@@ -246,11 +246,11 @@ parfor jjj = 1:lim % This is the loop for the number of days
             mm(:,:,i)=KInsert(mb,cor(i,:),2*(NumberElements+1));
             MB=MB+mm(:,:,i); % Beam mass matrix
         end
-        
+
         % Load Matricies
         pc=zeros(2*(NumberElements+1),1);
         qc=zeros(2*(NumberElements+1),1);
-        
+
         % Vehicle matricies
         muu=mv; muw=0;  mwu=0;  mww=mw;
         % Mv=[muu,muw;mwu,mww]; % Vehicle mass matrix
@@ -264,7 +264,7 @@ parfor jjj = 1:lim % This is the loop for the number of days
         lw=1;
         % ll=[lu;lw]; % Transformation matrix
         % um=[1]; % Unit matrix
-        
+
         % Initial Condition Bridge
         UB=zeros(2*NumberElements,1); % Initial global displacements
         VB=zeros(2*NumberElements,1); % Initial global velocities
@@ -272,12 +272,12 @@ parfor jjj = 1:lim % This is the loop for the number of days
         UB1=zeros(2*(NumberElements+1),Kt+1);
         AB1=zeros(2*(NumberElements+1),Kt+1);
         VB1=zeros(2*(NumberElements+1),Kt+1);
-        
+
         % Initial Condition Vehicle
         zu = zeros(2, kT); % Initial displacement vehicle
         zv = zeros(2, kT); % Initial velocity of vehicle
         za = zeros(2, kT); % Initial acceleration of vehicle
-        
+
         %% Newmark Method
         %Integration Parameters
         gamma=.5;
@@ -287,14 +287,14 @@ parfor jjj = 1:lim % This is the loop for the number of days
         a1 = 1/(phi*dT);       a5 = gamma/(phi*dT);
         a2 = 1/(2*phi)-1;      a6 =  (gamma/phi)-1;
         a3 = dT*(1-gamma);     a7 =  (dT/2)*((gamma/phi)-2);
-        
+
         % Contact Matricies
         PSIuu=a0*muu+a5*cuu+kuu;
         PSIwu=a0*mwu+a5*cwu+kwu;
         mc=lw\(mww-PSIwu*PSIuu\muw); %Mass contact matrix
         cc=lw\(cww-PSIwu*PSIuu\cuw); %Damping contact matrix
         kc=lw\(kww-PSIwu*PSIuu\kuw); %Stiffness contact matrix
-        
+
         %% Pre-allocate matrix sizes
         dz=zeros(1,Kt-1); % Change in upper vehicle displacement
         quc_tdt=zeros(1,Kt);% Uppdated contact Force
@@ -312,13 +312,13 @@ parfor jjj = 1:lim % This is the loop for the number of days
         K=zeros(2*NumberElements,2*NumberElements);
         C=zeros(2*NumberElements,2*NumberElements);
         wn_FEA=zeros(2*NumberElements,Kt-1);
-        
-        
+
+
         %% Calc global position and shape functions
         xo=nodes(J-1,2); % element start location
         xe=nodes(J,2); % elment end location
         cor(j,:)=ele(j,2:5); % Current element coordinate
-        
+
         for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
             xc=(xg-xo); % Local position
             xb=xc/l; % Local coordiante
@@ -327,43 +327,43 @@ parfor jjj = 1:lim % This is the loop for the number of days
             Ncd(i,:)=[-6*V(jjj,ii)^2*t/l^2+6*V(jjj,ii)^3*t^2/l^3, V(jjj,ii)-4*V(jjj,ii)^2*t/l+3*V(jjj,ii)^3*t^2/l^2, 6*V(jjj,ii)^2*t/l^2-6*V(jjj,ii)^3*t^2/l^3, 3*V(jjj,ii)^3*t^2/l^2-2*V(jjj,ii)^2*t/l];
             Ncdd(i,:)=[-6*V(jjj,ii)^2/l^2+12*V(jjj,ii)^3*t/l^3, -4*V(jjj,ii)^2/l+6*V(jjj,ii)^3*t/l^2, 6*V(jjj,ii)^2/l^2-12*V(jjj,ii)^3*t/l^3, 6*V(jjj,ii)^3*t/l^2-2*V(jjj,ii)^2/l];
             Nct=transpose(Nc); % Column Vector
-            
+
             % Load Vectors
             qu_t=muu*(a1*zv(1,i)+a2*za(1,i))+cuu*(a6*zv(1,i)+a7*za(1,i))-kuu*zu(1,i);
             qw_t=mwu*(a1*zv(1,i)+a2*za(1,i))+cwu*(a6*zv(1,i)+a7*za(1,i))-kwu*zu(1,i);
             pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
             qc_t=lw\(PSIwu*PSIuu\qu_t-qw_t);
-            
+
             % Interaction contact matrices
             mc_st=Nct(:,i)*mc*Nc(i,:); %Mass
             cc_st=Nct(:,i)*(2*V(jjj,ii)*mc*Ncd(i,:)+cc*Nc(i,:)); %Damping
             kc_st=Nct(:,i)*(V(jjj,ii)^2*mc*Ncdd(i,:)+V(jjj,ii)*cc*Ncd(i,:)+kc*Nc(i,:)); %Stiffness
-            
+
             % Equivalent nodal loads
             pc_tdt_st=Nct(:,i)*pc_tdt;
             qc_t_st=Nct(:,i)*qc_t;
-            
+
             % Global Stiffness
             KB1=KB; % resets global matrix each time
             kkh=KInsert(kc_st,cor(j,:),2*(NumberElements+1));
             KB1=KB1+kkh; % Updated beam stiffness matrix
-            
+
             % Global Mass
             MB1=MB; % resets global matrix each time
             mmh=KInsert(mc_st,cor(j,:),2*(NumberElements+1));
             MB1=MB1+mmh; % Updated beam stiffness matrix
-            
+
             % Apply boundary conditions to calculate damping matirx
             [M,K]=boundarycondition(MB1,KB1,M,K,NumberElements);
             ei=eig(K,M); % eigenvalues
             ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s]
             wn_FEA(:,i)=ef/(2*pi); % sorted natural angular frequencies [Hz]
-            
+
             % Beam damping matrix
             al=2*beta*wn_FEA(1,i)*wn_FEA(2,i)/(wn_FEA(1,i)+wn_FEA(2,i)); % Alpha for Rayleigh Damping
             be=2*beta/(wn_FEA(1,i)+wn_FEA(2,i)); % Beta for Rayleigh Damping
             CB=al*MB1+be*KB1; % Damping Matrix for beam
-            
+
             % Global Damping
             cch=KInsert(cc_st,cor(j,:),2*(NumberElements+1));
             CB=CB+cch; % Updated beam damping matrix
@@ -372,22 +372,22 @@ parfor jjj = 1:lim % This is the loop for the number of days
             C(2*NumberElements,1:2*NumberElements-1)=CB(2*(NumberElements+1),2:2*NumberElements);
             C(1:2*NumberElements-1,2*NumberElements)=CB(2:2*NumberElements,2*(NumberElements+1));
             C(2*NumberElements,2*NumberElements)=CB(2*(NumberElements+1),2*(NumberElements+1));
-            
+
             % Global Contact Loads
             PC1=pc;
             pch=KInsert2(pc_tdt_st,cor(j,:),2*(NumberElements+1));
             PC1=PC1+pch;
-            
+
             QC1=qc;
             qch=KInsert2(qc_t_st,cor(j,:),2*(NumberElements+1));
             QC1=QC1+qch;
-            
+
             % Apply Boundary Conditions for Load Matrices
             % Delete first and next to last row
             PC=zeros(2*NumberElements,1);
             QC=zeros(2*NumberElements,1);
             [PC,QC]=bcloads(NumberElements,PC1,PC,QC1,QC);
-            
+
             if Wind==1
                 % FW(:)=ForceWind(jjj,ii);
                 % Apply Numark Method
@@ -398,18 +398,18 @@ parfor jjj = 1:lim % This is the loop for the number of days
                 RS=-PC-QC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
                 LS=(a0*M+a4*a0*C+K);
             end
-            
+
             % Finding unknown displacements
             du(:,i)=LS\RS;
-            
+
             % Future Disp, Vel, Acc
             UB(:,i+1)=UB(:,i)+du(:,i); % Future displacement
             AB(:,i+1)=a0*du(:,i)-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
             VB(:,i+1)=VB(:,i)+a3*AB(:,i)+a4*AB(:,i+1); % Future Velocity
-            
+
             % Adding noise to the acceleration of bridge
             AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
-            
+
             % Add back constrained dof
             UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i);
             UB1(2*(NumberElements+1),i)=UB(2*NumberElements,i);
@@ -417,34 +417,34 @@ parfor jjj = 1:lim % This is the loop for the number of days
             AB1(2*(NumberElements+1),i)=AB(2*NumberElements,i);
             VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i);
             VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i);
-            
+
             % Element displacement, velocity, acceleration
             db(:,i)=UB1(cor(j,:),i); % Local Displacement
             vb(:,i)=VB1(cor(j,:),i); % Local Velocity
             ab(:,i)=AB1(cor(j,:),i); % Local Acceleration
-            
+
             % Contact points
             dc(:,i)=Nc(i,:)*db(:,i); % Contact displacement
             vc(:,i)=V(jjj,ii)*Ncd(i,:)*db(:,i)+Nc(i,:)*vb(:,i); % Contact velocity
             ac(:,i)=Nc(i,:)*ab(:,i)+2*V(jjj,ii)*Ncd(i,:)*vb(:,i)+(V(jjj,ii)^2)*Ncdd(i,:)*db(:,i); % Contact acceleration
-            
+
             % Future displacement, velocity and acceleration in lower vehicle
             zu(2,i+1)=dc(:,i); % Future displacement
             za(2,i+1)=vc(:,i); % Future Acceleration
             zv(2,i+1)=ac(:,i); % Future Velocity
-            
+
             % Contact Force
             % Vi_Tdt(:,i+1)=pc_tdt+qc_t+(mc*ac(:,i)+cc*vc(:,i)+kc*dc(:,i));
             quc_tdt(:,i+1)=muw*ac(:,i)+cuw*vc(:,i)+kuw*dc(:,i);
-            
+
             % Change in upper vehicle displacement
             dz(:,i)=PSIuu\(0-quc_tdt(:,i+1)+qu_t);
-            
+
             % Future displacement, vnocity and accneration in upper vehicle
             zu(1,i+1)=zu(1,i)+dz(:,i); % Future displacement
             za(1,i+1)=a0*dz(:,i)-a1*zv(1,i)-a2*za(1,i); % Future Acceleration
             zv(1,i+1)=zv(1,i)+a3*za(1,i)+a4*za(1,i+1); % Future Velocity
-            
+
             if xc>=l
                 j=j+1;
                 J=J+1;
