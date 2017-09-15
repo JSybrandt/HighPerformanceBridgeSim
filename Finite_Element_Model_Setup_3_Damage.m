@@ -81,7 +81,7 @@ fv=zeros(lim,n);
 %% Analysis
 % (Parallel Loop)
 % This is the loop for the number of days
-for jjj = (1:lim)
+parfor jjj = (1:lim)
 
     %Data for this iter
     Day = mod(jjj-1, lim) + 1;
