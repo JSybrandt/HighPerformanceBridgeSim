@@ -33,7 +33,7 @@ Rclass=BridgeVariables(Bridge,7);% Values For ISO Road Roughness Classification,
 
 % Surface Roughness
 if Surface==1
-  RoadMatrix=CompleteSurfaceRoughness(Rclass,L);
+[RoadMatrix]=CompleteSurfaceRoughness(Rclass,L);
 end
 
 % Damage Variables
@@ -65,7 +65,7 @@ if Wind==1
 end
 
 % Randomized vehicle selection and speed
-row=randi([1 3],lim,n); % Randomly selects which vehicle is crossing bridge
+row=randi([1 10],lim,n); % Randomly selects which vehicle is crossing bridge
 V=randi([10 25],lim,n); % Speed of vehicle m/s
 
 % Storage matrices and cell arrays (used to store information for machine
@@ -78,12 +78,15 @@ WheelStiffness=zeros(lim,n);
 SuspensionDamping=zeros(lim,n);
 WheelDamping=zeros(lim,n);
 AccelerationVehicle=cell(lim,n);
-AllFrequencyData=cell(lim,n);
+VehicleFrequencyData=cell(lim,n);
+RoadProfile=cell(lim,n);
+DerivativeRoadProfile=cell(lim,n);
+SecondDerivativeRoadProfile=cell(lim,n);
 fv=zeros(lim,n);
 
 
 for i=1:lim
-  
+
 if RainEffects==1;
 if i>=3
 if Rain(i)==1 && mu(i-1)>=1.01*BridgeVariables(Bridge,2);

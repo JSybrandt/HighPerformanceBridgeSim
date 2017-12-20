@@ -54,13 +54,13 @@ end
 end
 
 % Applying damaged modulus to elemental matrix
-       if Day>=DayDamage1;
+       if Day>=DayDamage1; 
            if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .4
                E_damaged1=E*.6;
            else
 E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
            end
-           kb_damaged1=KBeam(E_damaged1*u0,I,l);
+           kb_damaged1=KBeam(E_damaged1*u0,I,l); 
        end
 
        if Day>=DayDamage2;
@@ -77,12 +77,15 @@ kb=KBeam(E0,I,l); % Stiffness matrix for bridge
 mb=MBeam(mu(Day),l); % Consistent mass matrix for bridge
 
 % Vehicle parameters
-if row(Day,ii)==1;
-mv=VehicleVariables(row(Day,ii),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 3 vehicles)
+if row(Day,ii)<=3
+mv=VehicleVariables(row(Day,ii),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw=VehicleVariables(row(Day,ii),2); % wheel mass of vehicle kg
+elseif row(Day,ii)<=7 
+mv=VehicleVariables(row(Day,ii),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
+mw=VehicleVariables(row(Day,ii),2)+randi([-3 3],1,1); 
 else
-mw=VehicleVariables(row(Day,ii),2)+randi([-3 3],1,1);
-mv=VehicleVariables(row(Day,ii),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 3 vehicles)
+mv=VehicleVariables(row(Day,ii),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
+mw=VehicleVariables(row(Day,ii),2)+randi([-10 10],1,1);
 end
 kv=VehicleVariables(row(Day,ii),3); %Stiffness of vehicle spring N/m
 kw=VehicleVariables(row(Day,ii),6); %Stiffness of vehicle tire N/m
@@ -115,15 +118,15 @@ cor=zeros(NumberElements,4);
 kk=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
 mm=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
 for i=1:NumberElements
-   cor(i,:)=ele(i,2:5);
+   cor(i,:)=ele(i,2:5); 
    kk(:,:,i)=KInsert(kb,cor(i,:),2*(NumberElements+1));
    if Damage==1
    if i==DamageLocation(1,1); % Insert damage state 1
-       if Day>=DayDamage1;
+       if Day>=DayDamage1;       
    kk(:,:,i)=KInsert(kb_damaged1,cor(i,:),2*(NumberElements+1));
        end
    end
-
+   
    if i==DamageLocation(2,1); % Insert damage state 2
        if Day>=DayDamage2;
    kk(:,:,i)=KInsert(kb_damaged2,cor(i,:),2*(NumberElements+1));
@@ -205,7 +208,7 @@ xe=nodes(J,2); % elment end location
 cor(j,:)=ele(j,2:5); % Current element coordinate
 
 for i=1:Kt-1; % This loop is for calculating the accleration response for each vehicle crossing
-
+    
 xc=(xg-xo); % Local position
 xb=xc/l; % Local coordiante
 t=xc/V(Day,ii); % Local time
@@ -226,7 +229,7 @@ rch=KInsert2(rc_tdt_st,cor(j,:),2*(NumberElements+1));
 RC1=RC1+rch;
 end
 
-% Load Vectors
+% Load Vectors    
 qu_t=muu*(a1*zv(1,i)+a2*za(1,i))+cuu*(a6*zv(1,i)+a7*za(1,i))-kuu*zu(1,i);
 qw_t=mwu*(a1*zv(1,i)+a2*za(1,i))+cwu*(a6*zv(1,i)+a7*za(1,i))-kwu*zu(1,i);
 pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
@@ -251,10 +254,10 @@ MB1=MB; % resets global matrix each time
 mmh=KInsert(mc_st,cor(j,:),2*(NumberElements+1));
 MB1=MB1+mmh; % Updated beam stiffness matrix
 
-% Apply boundary conditions to calculate damping matirx
+% Apply boundary conditions to calculate damping matirx 
 [M,K]=boundarycondition(MB1,KB1,M,K,NumberElements);
 ei=eig(K,M); % eigenvalues
-ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s]
+ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s] 
 wn_FEA(:,i)=ef/(2*pi); % sorted natural angular frequencies [Hz]
 
 % Beam damping matrix
@@ -272,7 +275,7 @@ C(1:2*NumberElements-1,2*NumberElements)=CB(2:2*NumberElements,2*(NumberElements
 C(2*NumberElements,2*NumberElements)=CB(2*(NumberElements+1),2*(NumberElements+1));
 
 % Global Contact Loads
-PC1=pc;
+PC1=pc; 
 pch=KInsert2(pc_tdt_st,cor(j,:),2*(NumberElements+1));
 PC1=PC1+pch;
 
@@ -372,15 +375,27 @@ cor(j,:)=ele(j,2:5); % New element coordinates
 end
 % Update global x position for next loop
 xg=xg+dT*V(Day,ii);
-end
-wn_MAX(ii)=max(max(wn_FEA));
+end % end single vehicle loop
+% Shifting acceleration data out of time domain and into frequency domain
+Fs = 1/dT; % Sampling frequency                          
+t = (0:Kt-1)*dT; % Time vector
+f = Fs*(0:(Kt))/(Kt*2); % Frequency domain
 
-wn_MIN(ii)=min(min(wn_FEA));
+% Executing FFT for Vehicle
+fftV_FE=abs(fft(za(1,:),2*Kt));
 
-AllFrequencyData{Day,ii}=wn_FEA(1:2,:);
+Twosided_FE = fftV_FE/Kt; % two-sided spectrum
+onesided_FE = Twosided_FE(1:Kt+1); % Single-sided spectrum
+onesided_FE(2:end-1) = onesided_FE(2:end-1);
+
+
+VehicleFrequencyData{Day,ii}=onesided_FE;
 AccelerationVehicle{Day,ii}=za;
 Time{Day,ii}=T;
-end
+RoadProfile{Day,ii}=rx;
+DerivativeRoadProfile{Day,ii}=drx;
+SecondDerivativeRoadProfile{Day,ii}=ddrx;
+end % end day loop
 
 save(outPath)
 exitCode = 0;

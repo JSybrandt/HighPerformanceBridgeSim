@@ -73,7 +73,8 @@ function globalLoad(rootPath, day)
     global WheelDamping
     global fv
     global V
-    global AllFrequencyData
+    global VehicleFrequencyData
+    global RoadProfile
     global Time
     load(getDayPath(rootPath, day));
 end
@@ -95,39 +96,35 @@ function vec = getObservation(dayIdx, pointIdx)
     global WheelDamping
     global fv
     global V
-    global AllFrequencyData
+    global VehicleFrequencyData
+    global RoadProfile
     global Time
 
     vec = [
         % Booleans
-        Rain(dayIdx)
+        Rain(dayIdx)                                            % 1
 
         % Scalars
         % L
-        mu(dayIdx)
+        mu(dayIdx)                                              % 2
         %I
         %bbeta
 
         % Vectors
         % WindVelocity(Day, :)
         %ForceWind(dayIdx, :)
-        Tact(dayIdx, pointIdx)
-        VehicleMass(dayIdx, pointIdx)
-        WheelMass(dayIdx, pointIdx)
-        SuspensionStiffness(dayIdx, pointIdx)
-        WheelStiffness(dayIdx, pointIdx)
-        SuspensionDamping(dayIdx, pointIdx)
-        WheelDamping(dayIdx, pointIdx)
-        fv(dayIdx, pointIdx) % warning, this is still complex
-        V(dayIdx, pointIdx)
+        Tact(dayIdx, pointIdx)                                  % 3
+        VehicleMass(dayIdx, pointIdx)                           % 4
+        WheelMass(dayIdx, pointIdx)                             % 5
+        SuspensionStiffness(dayIdx, pointIdx)                   % 6
+        WheelStiffness(dayIdx, pointIdx)                        % 7
+        SuspensionDamping(dayIdx, pointIdx)                     % 8
+        WheelDamping(dayIdx, pointIdx)                          % 9
+        fv(dayIdx, pointIdx) % warning, this is still complex   % 10
+        V(dayIdx, pointIdx)                                     % 11
 
         % Vector of Cells
-        min(AllFrequencyData{dayIdx, pointIdx}(1,:))
-        max(AllFrequencyData{dayIdx, pointIdx}(1,:))
-        mean(AllFrequencyData{dayIdx, pointIdx}(1,:))
-        min(AllFrequencyData{dayIdx, pointIdx}(2,:))
-        max(AllFrequencyData{dayIdx, pointIdx}(2,:))
-        mean(AllFrequencyData{dayIdx, pointIdx}(2,:))
-        max(Time{dayIdx, pointIdx})
+
+        max(Time{dayIdx, pointIdx})                             %
    ];
 end

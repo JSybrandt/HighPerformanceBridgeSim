@@ -1,0 +1,3 @@
+[submodule "code/libsvm-OpenMP"]
+	path = code/libsvm-OpenMP
+	url = git@github.com:yttty/libsvm-OpenMP.git
