@@ -389,7 +389,9 @@ onesided_FE = Twosided_FE(1:Kt+1); % Single-sided spectrum
 onesided_FE(2:end-1) = onesided_FE(2:end-1);
 
 
-VehicleFrequencyData{Day,ii}=onesided_FE;
+VehicleFrequencyData{Day,ii}=f;
+VehicleFrequencyAmpData{Day,ii}=onesided_FE;
+BridgeFrequencyData{Day,ii}=wn_FEA;
 AccelerationVehicle{Day,ii}=za;
 Time{Day,ii}=T;
 RoadProfile{Day,ii}=rx;

@@ -124,6 +124,7 @@ function vec = getObservation(dayIdx, pointIdx)
         V(dayIdx, pointIdx)                                     % 11
 
         % Vector of Cells
+        RoadProfile{dayIdx, pointIdx} % results in a vector of observations
 
         max(Time{dayIdx, pointIdx})                             %
    ];
