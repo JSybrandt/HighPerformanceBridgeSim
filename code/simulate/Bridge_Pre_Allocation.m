@@ -1,10 +1,10 @@
 function exitCode = Bridge_Pre_Allocation(path)
 
 % Pre-Processing (Change values manually)
-Surface=1; % 1 if surface is considered, 0 otherwise
+Surface=0; % 1 if surface is considered, 0 otherwise
 Wind=0; % 1 if wind effects are considered, 0 otherwise
-Temp=1; % 1 if temp effects are considered, 0 otherwise
-RainEffects=1; % 1 if rain effects are considered, 0 otherwise
+Temp=0; % 1 if temp effects are considered, 0 otherwise
+RainEffects=0; % 1 if rain effects are considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
 Bridge=1; % Indicates which bridge is being tested
 lim=361; % Number of days monitoring subject bridge
@@ -71,6 +71,7 @@ V=randi([10 25],lim,n); % Speed of vehicle m/s
 % Storage matrices and cell arrays (used to store information for machine
 % learning)
 Time=cell(lim,n);
+DamageClass=zeros(lim,n);
 VehicleMass=zeros(lim,n);
 WheelMass=zeros(lim,n);
 SuspensionStiffness=zeros(lim,n);

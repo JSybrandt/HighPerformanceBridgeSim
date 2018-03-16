@@ -6,36 +6,33 @@ SIM = $(SRC)/simulate
 ANA = $(SRC)/analysis
 BIN = bin
 
-main: $(BIN)/Bridge_Pre_Allocation $(BIN)/SimulateDay $(BIN)/createDataMatrix $(BIN)/trainSubset
-	rm mccExcludedFiles.log
-	rm requiredMCRProducts.txt
-	rm readme.txt
+main: $(BIN)/Bridge_Pre_Allocation $(BIN)/SimulateDay $(BIN)/createDataMatrix $(BIN)/zero_one_scale
+	rm -f mccExcludedFiles.log
+	rm -f requiredMCRProducts.txt
+	rm -f readme.txt
 
 $(BIN)/SimulateDay: $(SIM)/SimulateDay.m
 	$(CC) $(FLAGS) -m $< -o SimulateDay
-	rm run_SimulateDay.sh
+	rm -f run_SimulateDay.sh
 	mv SimulateDay $@
 
 $(BIN)/Bridge_Pre_Allocation: $(SIM)/Bridge_Pre_Allocation.m
 	$(CC) $(FLAGS) -m $< -o Bridge_Pre_Allocation
-	rm run_Bridge_Pre_Allocation.sh
+	rm -f run_Bridge_Pre_Allocation.sh
 	mv Bridge_Pre_Allocation $@
 
-$(BIN)/createDataMatrix: $(ANA)/createDataMatrix.m
+$(BIN)/createDataMatrix: $(ANA)/createDataMatrix.m $(ANA)/day2Mat.m
 	$(CC) $(FLAGS) -m $< -o createDataMatrix
-	rm run_createDataMatrix.sh
+	rm -f run_createDataMatrix.sh
 	mv createDataMatrix $@
 
-$(BIN)/writeForLibSVM: $(ANA)/writeForLibSVM.m
-	$(CC) -R -nodisplay -R -nojvm -m $< -g -o writeForLibSVM
-	rm run_writeForLibSVM.sh
-	mv writeForLibSVM $@
-
-
-$(BIN)/trainSubset: $(ANA)/trainSubset.m
-	$(CC) -R -nodisplay -R -nojvm -m $< -g -o trainSubset
-	rm run_trainSubset.sh
-	mv trainSubset $@
+$(BIN)/zero_one_scale: $(ANA)/zero_one_scale.m
+	$(CC) -R -nodisplay -R -nojvm -m $< -g -o zero_one_scale
+	rm -f run_zero_one_scale.sh
+	mv zero_one_scale $@
 
 lightClean:
-	rm mccExcludedFiles.log  requiredMCRProducts.txt readme.txt
+	rm -f mccExcludedFiles.log  requiredMCRProducts.txt readme.txt
+
+clean:
+	rm -rf bin/*
