@@ -1,17 +1,20 @@
 function out = createDataMatrix(inPath, outPath)
 
 NUM_PEAKS = 10;
-NUM_FEATURES = 22;
+NUM_FEATURES = 26;
 
+PEAK_DATA_COLS=20
 MASS_COL=21;
 SPEED_COL=22;
-RECORD_DAY_COL = 23;
-MIN_BRIDGE_FREQ_COL = 24;
-MAX_BRIDGE_FREQ_COL = 25;
+TEMP_COL=23;
+RAIN_COL=24
+DAY_COL = 25;
 DAMAGE_CLASS_COL = 26;
 
+% select everything
 SAMPLE_RATIO = 1;
-SELECT_MASS = 8000;
+% don't subset by mass
+SELECT_MASS = 0;
 
 load(inPath, 'data');
 
@@ -32,21 +35,19 @@ maxs(1:NUM_PEAKS) = max(maxs(1:NUM_PEAKS));
 mins(NUM_PEAKS+1:2*NUM_PEAKS) = min(mins(NUM_PEAKS+1:2*NUM_PEAKS));
 maxs(NUM_PEAKS+1:2*NUM_PEAKS) = max(maxs(NUM_PEAKS+1:2*NUM_PEAKS));
 
-% put bridge freqs in same scale
-mins(MIN_BRIDGE_FREQ_COL:MAX_BRIDGE_FREQ_COL) = ...
-  min(mins(MIN_BRIDGE_FREQ_COL:MAX_BRIDGE_FREQ_COL));
-maxs(MIN_BRIDGE_FREQ_COL:MAX_BRIDGE_FREQ_COL) = ...
-  max(maxs(MIN_BRIDGE_FREQ_COL:MAX_BRIDGE_FREQ_COL));
-
 dists = maxs - mins;
+
+% If any columns are all the same number, don't scale
+% Fixes the div by zero
+dists(dists==0) = 1
 
 % don't scale class
 dists(DAMAGE_CLASS_COL) = 1;
 mins(DAMAGE_CLASS_COL) = 0;
 
 % don't scale day
-dists(RECORD_DAY_COL) = 1;
-mins(RECORD_DAY_COL) = 0;
+dists(DAY_COL) = 1;
+mins(DAY_COL) = 0;
 
 data = (data - mins) ./ dists;
 

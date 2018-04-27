@@ -1,18 +1,16 @@
-function [M,K,C]=boundarycondition(MB1,KB1,M,K,n,CB1,C)
-if nargin < 6
-CB1=zeros(2*(n+1),2*(n+1));
-C=zeros(2*n,2*n);
-end  
-M(1:2*n-1,1:2*n-1)=MB1(2:2*n,2:2*n);
-M(2*n,1:2*n-1)=MB1(2*(n+1),2:2*n);
-M(1:2*n-1,2*n)=MB1(2:2*n,2*(n+1));
-M(2*n,2*n)=MB1(2*(n+1),2*(n+1));
-K(1:2*n-1,1:2*n-1)=KB1(2:2*n,2:2*n);
-K(2*n,1:2*n-1)=KB1(2*(n+1),2:2*n);
-K(1:2*n-1,2*n)=KB1(2:2*n,2*(n+1));
-K(2*n,2*n)=KB1(2*(n+1),2*(n+1));
-C(1:2*n-1,1:2*n-1)=CB1(2:2*n,2:2*n);
-C(2*n,1:2*n-1)=CB1(2*(n+1),2:2*n);
-C(1:2*n-1,2*n)=CB1(2:2*n,2*(n+1));
-C(2*n,2*n)=CB1(2*(n+1),2*(n+1));
+function [M,K]=boundarycondition(M,K,NumberElements)
+% if nargin < 6
+% CB1=zeros(2*(n+1),2*(n+1));
+% C=zeros(2*n,2*n);
+% end  
+M(2*NumberElements+1,:)=[];
+M(:,2*NumberElements+1)=[];
+M(1,:)=[];
+M(:,1)=[];
+
+K(2*NumberElements+1,:)=[];
+K(:,2*NumberElements+1)=[];
+K(1,:)=[];
+K(:,1)=[];
+
 end

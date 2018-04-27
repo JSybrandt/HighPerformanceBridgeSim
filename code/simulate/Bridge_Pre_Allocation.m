@@ -1,23 +1,25 @@
 function exitCode = Bridge_Pre_Allocation(path)
 
 % Pre-Processing (Change values manually)
-Surface=0; % 1 if surface is considered, 0 otherwise
+Multiple_Vehicles=1; % 1 if multiple vehicles are considered, 0 if just 1 vehicle is being considered
+Surface=1; % 1 if surface is considered, 0 otherwise
 Wind=0; % 1 if wind effects are considered, 0 otherwise
-Temp=0; % 1 if temp effects are considered, 0 otherwise
+Temp=1; % 1 if temp effects are considered, 0 otherwise
 RainEffects=0; % 1 if rain effects are considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
+Damage_Case=1; % Determines which damage case being analyzed
 Bridge=1; % Indicates which bridge is being tested
-lim=361; % Number of days monitoring subject bridge
+lim=720; % Number of days monitoring subject bridge
 NumberElements=10; % Number of elements bridge is divided into
 
 % Load variable arrays
-BridgeVariables=load('BridgeVariables.dat');
-VehicleVariables=load('VehicleData.dat');
-load('USW00003870.hourly.mat'); 
+BridgeVariables=load('data/BridgeVariables.dat');
+VehicleVariables=load('data/VehicleData.dat');
+load('data/USW00003870.hourly.double.mat');
 
 %% Pre Analysis Calculations (Sets up environmental and vehicle parameters)
 Td=0:.016667:24; %Time of day record was taken (Assumes vehicles cross bridge every min of a day)
-n=length(Td); % Number of cases looking at a single car crossing bridge
+n=length(Td); % Number of times a monitoring vehicle crossed the bridge
 
 % Bridge Parameters
 L=BridgeVariables(Bridge,1); % Length m
@@ -29,27 +31,38 @@ I=BridgeVariables(Bridge,4); % Moment of Inertia m^4
 mu(1:(lim-1))=BridgeVariables(Bridge,2); % mass per unit length kg/m
 bbeta=BridgeVariables(Bridge,5); % Damping of bridge
 Rclass=BridgeVariables(Bridge,7);% Values For ISO Road Roughness Classification, from 3 to 9
-[ele, nodes]=element(NumberElements,l,L);
+[ele, ele2, nodes, nodes2]=element(NumberElements,l,L,Multiple_Vehicles);
 
 % Surface Roughness
 if Surface==1
 [RoadMatrix]=CompleteSurfaceRoughness(Rclass,L);
 end
 
+if Damage == 1
+  DamageClass=zeros(lim);
+end
 % Damage Variables
-if Damage==1;
-DamageLocation=randsample(ele(:,1),2); % Where damage locations begin
+if Damage==1 && Damage_Case==1
+DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
 DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
-DayDamage2=round(lim*.5)+round(rand(1)*(lim*.67-lim*.5)); % The day second damage is iniciated on bridge
-ED1=[((.1+rand(1)*(.2-.1))*E),.005*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
-ED2=[((.1+rand(1)*(.2-.1))*E),.005*rand(1,(lim-DayDamage2+1))*E]; % Damaged Modulus 2
-else
-    DayDamage1=1000000;
-    DayDamage2=1000000;
+ED1=[((.05+rand(1)*(.1-.05))*E),.0025*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
+
+elseif Damage==1 && Damage_Case==2
+DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
+DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge
+DayDamage2=round(lim*.35)+round(rand(1)*(lim*.45-lim*.35)); % The day second damage is iniciated on bridge
+DayDamage3=round(lim*.55)+round(rand(1)*(lim*.65-lim*.55)); % The day damage is iniciated on bridge
+DayDamage4=round(lim*.7)+round(rand(1)*(lim*.75-lim*.7)); % The day damage is iniciated on bridge
+DayDamage5=round(lim*.8)+round(rand(1)*(lim*.9-lim*.8)); % The day damage is iniciated on bridge
+ED1=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 1
+ED2=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 2
+ED3=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 3
+ED4=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 4
+ED5=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 5
 end
 
 % Environment matrices (Rain, Temp, Wind)
-if RainEffects==1;
+if RainEffects==1
 Rain=[0,0,randi([0 5],1,lim+1)];
 Rain(Rain<4)=0;
 Rain(Rain>0)=1;
@@ -65,34 +78,106 @@ if Wind==1
 end
 
 % Randomized vehicle selection and speed
+if Multiple_Vehicles==1
+number_vehicles=randi([1 2],lim,n); % Randomly determines how many vehicles will cross bridge
+row=zeros(lim,n,3);
+V=zeros(lim,n,3);
+
+MonitorVehicleMass=zeros(lim,n);
+MonitorWheelMass=zeros(lim,n);
+MonitorSuspensionStiffness=zeros(lim,n);
+MonitorWheelStiffness=zeros(lim,n);
+MonitorSuspensionDamping=zeros(lim,n);
+MonitorWheelDamping=zeros(lim,n);
+Monitorfv=cell(lim,n);
+
+SecondVehicleMass=zeros(lim,n);
+SecondWheelMass=zeros(lim,n);
+SecondSuspensionStiffness=zeros(lim,n);
+SecondWheelStiffness=zeros(lim,n);
+SecondSuspensionDamping=zeros(lim,n);
+SecondWheelDamping=zeros(lim,n);
+Secondfv=cell(lim,n);
+
+% Storage matrices and cell arrays (used to store information for machine
+% learning)
+Monitor_Vehicle_Time=cell(lim,n);
+Monitor_Vehicle_Acceleration=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Monitor_Vehicle_Frequency_Data=cell(lim,n);
+Monitor_Vehicle_Road_Profile=cell(lim,n);
+Monitor_Vehicle_Derivative_Road_Profile=cell(lim,n);
+Monitor_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
+
+Other_Vehicle_Time=cell(lim,n);
+Other_Vehicle_Acceleration=cell(lim,n);
+Other_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Other_Vehicle_Frequency_Data=cell(lim,n);
+Other_Vehicle_Road_Profile=cell(lim,n);
+Other_Vehicle_Derivative_Road_Profile=cell(lim,n);
+Other_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
+
+Start_Time_Following_Vehicle=zeros(lim,n);
+Order_of_Vehicles=cell(lim,n);
+
+for gg=1:lim
+    for hh=1:n
+if number_vehicles(gg,hh)==1
+    row(gg,hh,1)=randi([1 10]);
+    row(gg,hh,2)=0;
+%     row(gg,hh,3)=0;
+
+    V(gg,hh,1)=randi([10 25]);
+    V(gg,hh,2)=0;
+%     V(gg,hh,3)=0;
+elseif number_vehicles(gg,hh)==2
+    row(gg,hh,1)=randi([1 10]);
+    row(gg,hh,2)=randi([1 10]);
+%     row(gg,hh,3)=0;
+
+    V(gg,hh,1)=randi([10 25]);
+    V(gg,hh,2)=randi([10 25]);
+%     V(gg,hh,3)=0;
+% elseif number_vehicles(gg,hh)==3
+%     row(gg,hh,1)=randi([1 10]);
+%     row(gg,hh,2)=randi([1 10]);
+%     row(gg,hh,3)=randi([1 10]);
+%
+%     V(gg,hh,1)=randi([10 25]);
+%     V(gg,hh,2)=randi([10 25]);
+%     V(gg,hh,3)=randi([10 V(gg,hh,2)]);
+end
+    end
+end
+else
+
+MonitorVehicleMass=zeros(lim,n);
+MonitorWheelMass=zeros(lim,n);
+MonitorSuspensionStiffness=zeros(lim,n);
+MonitorWheelStiffness=zeros(lim,n);
+MonitorSuspensionDamping=zeros(lim,n);
+MonitorWheelDamping=zeros(lim,n);
+Monitorfv=cell(lim,n);
+
 row=randi([1 10],lim,n); % Randomly selects which vehicle is crossing bridge
 V=randi([10 25],lim,n); % Speed of vehicle m/s
 
 % Storage matrices and cell arrays (used to store information for machine
 % learning)
-Time=cell(lim,n);
-DamageClass=zeros(lim,n);
-VehicleMass=zeros(lim,n);
-WheelMass=zeros(lim,n);
-SuspensionStiffness=zeros(lim,n);
-WheelStiffness=zeros(lim,n);
-SuspensionDamping=zeros(lim,n);
-WheelDamping=zeros(lim,n);
-AccelerationVehicle=cell(lim,n);
-VehicleFrequencyAmpData=cell(lim,n);
-VehicleFrequencyData=cell(lim,n);
-BridgeFrequencyData=cell(lim,n);
-RoadProfile=cell(lim,n);
-DerivativeRoadProfile=cell(lim,n);
-SecondDerivativeRoadProfile=cell(lim,n);
-fv=zeros(lim,n);
+Monitor_Vehicle_Time=cell(lim,n);
+Monitor_Vehicle_Acceleration=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Monitor_Vehicle_Frequency_Data=cell(lim,n);
+Monitor_Vehicle_Road_Profile=cell(lim,n);
+Monitor_Vehicle_Derivative_Road_Profile=cell(lim,n);
+Monitor_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
+end
 
+if RainEffects==1
+    for i=1:lim
 
-for i=1:lim
-
-if RainEffects==1;
-if i>=3
-if Rain(i)==1 && mu(i-1)>=1.01*BridgeVariables(Bridge,2);
+        if i>=3
+if Rain(i)==1 && mu(i-1)>=1.01*BridgeVariables(Bridge,2)
        mu(i)=1.01*BridgeVariables(Bridge,2);
 elseif Rain(i)==1
        mu(i)=mu(i-1)+.001*rand(1,1)*BridgeVariables(Bridge,2);
@@ -101,10 +186,10 @@ elseif Rain(i)==0 && Rain(i-1)==1
 elseif Rain(i)==0 && mu(i-1)>BridgeVariables(Bridge,2)
            mu(i)=mu(i-1)-.001*rand(1,1)*BridgeVariables(Bridge,2);
 elseif Rain(i)==0 && mu(i-1)<=.99*BridgeVariables(Bridge,2)
-           mu(i)=.99*BridgeVariables(Bridge,2);  
+           mu(i)=.99*BridgeVariables(Bridge,2);
 end
-end
-end
+        end
+    end
 end
 
 save(path)

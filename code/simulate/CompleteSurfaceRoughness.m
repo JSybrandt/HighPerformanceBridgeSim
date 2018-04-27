@@ -1,7 +1,7 @@
 function [RoadMatrix]=CompleteSurfaceRoughness(RoughnessClassification,Length)
 Velocity=1;
 dT=.001; % Time Step
-Time=0:dT:Length/Velocity; % Total time to cross bridge
+Time=0:dT:(Length+dT)/Velocity; % Total time to cross bridge
 DataPoints=length(Time); % Number of Data points
 
 if RoughnessClassification==3
@@ -16,12 +16,12 @@ else
     end
 end
 
-SamplingInterval=Length/DataPoints;
+SamplingInterval=(Length+dT)/DataPoints;
 DeltaN=(1/(SamplingInterval)-1)/(DataPoints-1);
 SpatialFrequencyBand=1:DeltaN:(1/(SamplingInterval)); % Spatial Frequency Band
 PhaseAngle=2*pi*rand(1,DataPoints); % Random Phase Angle
 n0 = 0.1; % Spatial Frequency (cycles/m)
-xx = 0:SamplingInterval:Length-SamplingInterval; % Abscissa Variable from 0 to L (+3*Length/DataPoints)
+xx = 0:SamplingInterval:(Length+dT)-SamplingInterval; % Abscissa Variable from 0 to L 
 GD=gd*(SpatialFrequencyBand./n0).^-2;
 d=sqrt(2*GD.*DeltaN);
 rx = zeros(size(xx));
