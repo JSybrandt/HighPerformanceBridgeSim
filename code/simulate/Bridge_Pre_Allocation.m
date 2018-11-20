@@ -55,15 +55,13 @@ if Surface==1
 [RoadMatrix]=CompleteSurfaceRoughness(Rclass,L);
 end
 
-if Damage == 1
-  DamageClass=zeros(lim);
-end
 % Damage Variables
 if Damage==1 && Damage_Case==1
 DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
 DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
+% DayDamage2=round(lim*.5)+round(rand(1)*(lim*.67-lim*.5)); % The day second damage is iniciated on bridge
 ED1=[((.05+rand(1)*(.1-.05))*E),.0025*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
-
+% ED2=[((.1+rand(1)*(.2-.1))*E),.005*rand(1,(lim-DayDamage2+1))*E]; % Damaged Modulus 2
 elseif Damage==1 && Damage_Case==2
 DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
 DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge
@@ -72,10 +70,10 @@ DayDamage3=round(lim*.55)+round(rand(1)*(lim*.65-lim*.55)); % The day damage is 
 DayDamage4=round(lim*.7)+round(rand(1)*(lim*.75-lim*.7)); % The day damage is iniciated on bridge
 DayDamage5=round(lim*.8)+round(rand(1)*(lim*.9-lim*.8)); % The day damage is iniciated on bridge
 ED1=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 1
-ED2=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 2
+ED2=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 2   
 ED3=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 3
-ED4=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 4
-ED5=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 5
+ED4=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 4 
+ED5=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 5  
 end
 
 % Environment matrices (Rain, Temp, Wind)
@@ -143,7 +141,7 @@ if number_vehicles(gg,hh)==1
     row(gg,hh,1)=randi([1 10]);
     row(gg,hh,2)=0;
 %     row(gg,hh,3)=0;
-
+    
     V(gg,hh,1)=randi([10 25]);
     V(gg,hh,2)=0;
 %     V(gg,hh,3)=0;
@@ -151,7 +149,7 @@ elseif number_vehicles(gg,hh)==2
     row(gg,hh,1)=randi([1 10]);
     row(gg,hh,2)=randi([1 10]);
 %     row(gg,hh,3)=0;
-
+    
     V(gg,hh,1)=randi([10 25]);
     V(gg,hh,2)=randi([10 25]);
 %     V(gg,hh,3)=0;
@@ -159,7 +157,7 @@ elseif number_vehicles(gg,hh)==2
 %     row(gg,hh,1)=randi([1 10]);
 %     row(gg,hh,2)=randi([1 10]);
 %     row(gg,hh,3)=randi([1 10]);
-%
+%     
 %     V(gg,hh,1)=randi([10 25]);
 %     V(gg,hh,2)=randi([10 25]);
 %     V(gg,hh,3)=randi([10 V(gg,hh,2)]);
@@ -167,7 +165,7 @@ end
     end
 end
 else
-
+    
 MonitorVehicleMass=zeros(lim,n);
 MonitorWheelMass=zeros(lim,n);
 MonitorSuspensionStiffness=zeros(lim,n);
@@ -192,7 +190,7 @@ end
 
 if RainEffects==1
     for i=1:lim
-
+  
         if i>=3
 if Rain(i)==1 && mu(i-1)>=1.01*BridgeVariables(Bridge,2)
        mu(i)=1.01*BridgeVariables(Bridge,2);
@@ -203,11 +201,29 @@ elseif Rain(i)==0 && Rain(i-1)==1
 elseif Rain(i)==0 && mu(i-1)>BridgeVariables(Bridge,2)
            mu(i)=mu(i-1)-.001*rand(1,1)*BridgeVariables(Bridge,2);
 elseif Rain(i)==0 && mu(i-1)<=.99*BridgeVariables(Bridge,2)
-           mu(i)=.99*BridgeVariables(Bridge,2);
+           mu(i)=.99*BridgeVariables(Bridge,2);  
 end
         end
     end
 end
+
+% Vehicle Frequency Loop
+% for i=1:11
+% mv_Mon=VehicleVariables(i,1);
+% mw_Mon=VehicleVariables(i,2);
+% kv_Mon=VehicleVariables(i,3); %Stiffness of vehicle spring N/m
+% kw_Mon=VehicleVariables(i,6); %Stiffness of vehicle tire N/m
+% cs_Mon=VehicleVariables(i,4); % Damping of vehicle spring N*s/m
+% cw_Mon=VehicleVariables(i,5); % Damping of vehicle tire N*s/m
+% 
+% 
+% K_Mon=[kv_Mon, -kv_Mon; -kv_Mon, kv_Mon+kw_Mon];
+% M_Mon=[mv_Mon, 0; 0, mw_Mon];
+% ei_Mon=eig(K_Mon,M_Mon); % eigenvalues
+% ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s] 
+% Vehicle(:,i)=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
+% 
+% end
 
 save(output_path)
 exitCode = 0;

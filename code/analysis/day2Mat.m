@@ -1,14 +1,9 @@
 % This function is NOT designed to be called from command line
 function result = day2Mat(input_path, record_both_cars)
-  % In order to see progress, output the path
-  disp(input_path)
 
   % Some constants to help the later calculations
   NUM_PEAKS = 10;
   NUM_FEATURES = 2 * NUM_PEAKS + 6;
-
-  % Turn off load warnings, makes the progress clearer while running
-  warning('off','all')
 
   % Load the day's data. By requesting each variable here, we get a clearer
   % error if something went wrong.
@@ -66,7 +61,7 @@ function result = day2Mat(input_path, record_both_cars)
       rain = 0;
     end
 
-    dc = DamageClass(Day, car_idx);
+    damage_class = DamageClass(Day, car_idx);
 
     % Warning, order matters, must equal the input order in python scripts
     result = [select_peaks(:)', ...
@@ -75,7 +70,7 @@ function result = day2Mat(input_path, record_both_cars)
               temp, ...
               rain, ...
               Day, ...
-              dc];
+              damage_class];
   end % getVehicleData
 
   % pre-allocate result, may over-allocate if Multiple_Vehicles
@@ -89,7 +84,7 @@ function result = day2Mat(input_path, record_both_cars)
   % track rows in result
   curr_idx = 1;
   for car_idx = 1:num_cars
-    if Multiple_Vehicles
+    if Multiple_Vehicles == 1
       for v = Order_of_Vehicles{Day, car_idx}
         if v == 1
           result(curr_idx,:) = getVehicleData(...
