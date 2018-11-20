@@ -15,7 +15,7 @@ cd $PBS_O_WORKDIR
 
 # Constants
 SCRATCH="/scratch2/$USER"
-PROJECT="bridge"
+PROJECT="compat_check"
 DAYS_TO_SIMULATE=719
 RECORD_BOTH_CARS=0
 
