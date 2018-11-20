@@ -1,91 +1,111 @@
 #!/bin/bash
 #PBS -N runBridge
 #PBS -l select=10:ncpus=24:mem=120gb,walltime=72:00:00
-#PBS -o /dev/null
-#PBS -e /dev/null
 
+# Doop Doop
+#  - - PBS -o /dev/null
+#  - - PBS -e /dev/null
 
-module load matlab gnu-parallel
+# Includes
+module load matlab
+module load gnu-parallel
 
-if [ -z "$PBS_O_WORKDIR" ]; then
-  echo "Not Moving"
-else
-  cd $PBS_O_WORKDIR
-  echo $PBS_O_WORKDIR
+# Move to location of qsub
+cd $PBS_O_WORKDIR
+
+# Constants
+SCRATCH="/scratch2/$USER"
+PROJECT="bridge"
+DAYS_TO_SIMULATE=719
+RECORD_BOTH_CARS=0
+
+PROJECT_DIR="$SCRATCH/$PROJECT"
+mkdir -p $PROJECT_DIR
+
+PRE_ALLOCATION="bin/Bridge_Pre_Allocation"
+if [ ! -f "$PRE_ALLOCATION" ]; then
+  echo "Failed to find $PRE_ALLOCATION. Run make"
+  exit 1
 fi
 
+SIMULATE="bin/SimulateDay"
+if [ ! -f "$SIMULATE" ]; then
+  echo "Failed to find $SIMULATE. Run make"
+  exit 1
+fi
 
-TOTAL_DAYS=719
+COMBINE_DATA="bin/createDataMatrix"
+if [ ! -f "$COMBINE_DATA" ]; then
+  echo "Failed to find $COMBINE_DATA. Run make"
+  exit 1
+fi
 
-function setup(){
-  FILE="code/simulate/Bridge_Pre_Allocation.m"
-  MULT=$1
-  DAM=$2
-  ENV_EFF=$3
-  sed -i -E "s/^Multiple_Vehicles=[01]/Multiple_Vehicles=$MULT/g" $FILE
-  sed -i -E "s/^Damage_Case=[12]/Damage_Case=$DAM/g" $FILE
-  sed -i -E "s/^Temp=[01]/Temp=$ENV_EFF/g" $FILE
-  sed -i -E "s/^RainEffects=[01]/RainEffects=0/g" $FILE
-  sed -i -E "s/^Surface=[01]/Surface=$ENV_EFF/g" $FILE
+SCALE_DATA="bin/zero_one_scale"
+if [ ! -f "$SCALE_DATA" ]; then
+  echo "Failed to find $SCALE_DATA. Run make"
+  exit 1
+fi
 
-  make bin/Bridge_Pre_Allocation
-}
+# For each of our bridge cases
+for MULT_VEHICLES in 0 1; do
+  for DAMAGE_CASE in 1 2; do
+    for ENVIRONMENTAL_EFFECTS in 0 1; do
 
-function makeResDir(){
-  D="/scratch2/jsybran/old_bridge_stuff/rebuilt_bridge/M$1_D$2_E$3"
-  mkdir -p $D
-  mkdir -p $D/dayData
-  echo $D
-}
-
-for MULT in 0 1; do
-  for DAM in 1 2; do
-    for ENV_EFF in 0 1; do
-
-      RES_DIR=$(makeResDir $MULT $DAM $ENV_EFF)
-      echo $RES_DIR
-      if [ ! -f $RES_DIR/intermediate_data.mat ]; then
-        # compile preallocation and setup res dir
-        setup $MULT $DAM $ENV_EFF
-        # actually preallocate
-        ./bin/Bridge_Pre_Allocation $RES_DIR/intermediate_data
+      # Get project name
+      if [ $MULT_VEHICLES -eq 0 ]; then
+        MV_TAG="one_car"
+      else
+        MV_TAG="two_cars"
+      fi
+      if [ $DAMAGE_CASE -eq 1 ]; then
+        DC_TAG="continuous_damage"
+      else
+        DC_TAG="discrete_damage"
+      fi
+      if [ $ENVIRONMENTAL_EFFECTS -eq 0 ]; then
+        EN_TAG="env_off"
+      else
+        EN_TAG="env_on"
       fi
 
-      if [ ! -f $RES_DIR/done.flag ]; then
-        echo "WRITING DAYS FOR $RES_DIR"
+      CASE_DIR="$PROJECT_DIR/$MV_TAG.$DC_TAG.$EN_TAG"
+      mkdir -p $CASE_DIR
+
+      # If the pre_allocation file hasn't been made
+      if [ ! -f "$CASE_DIR/pre_allocation.mat" ]; then
+        # Run this case
+        $PRE_ALLOCATION \
+          $CASE_DIR/pre_allocation \
+          $MULT_VEHICLES \
+          $DAMAGE_CASE \
+          $ENVIRONMENTAL_EFFECTS
+      fi
+
+      DAY_DIR="$CASE_DIR/daily_sim"
+      mkdir -p $DAY_DIR
+      # If the number of days simulated is less than the days we would like
+      if [ $( ls $DAY_DIR | wc -l ) -lt $DAYS_TO_SIMULATE ]; then
+        # For each day (1 to $DAYS_TO_SIMULATE) run SimulateDay
         parallel --workdir $PBS_O_WORKDIR --sshloginfile $PBS_NODEFILE \
           "module load matlab; \
-           ./bin/SimulateDay $RES_DIR/intermediate_data {} $RES_DIR/dayData/{}" \
-        ::: $(seq 1 $TOTAL_DAYS)
-        touch $RES_DIR/done.flag
+           $SIMULATE $CASE_DIR/pre_allocation {} $DAY_DIR/{}" \
+        ::: $(seq 1 $DAYS_TO_SIMULATE)
       fi
 
-      #COMPILING
-
-      if [ ! -f $RES_DIR/no_other.mat ]; then
-        echo "COMPILING $RES_DIR WITH ONLY PRIMARY VEHICLES"
-        ./bin/createDataMatrix $RES_DIR/dayData $RES_DIR/no_other 0
+      if [ ! -f "$CASE_DIR/combined_raw_data.mat" ]; then
+        $COMBINE_DATA \
+          $CASE_DIR/dayData \
+          $CASE_DIR/combined_raw_data \
+          $RECORD_BOTH_CARS
       fi
 
-      if [ $MULT -eq 1 ] && [ ! -f $RES_DIR/with_other.mat ]; then
-        echo "COMPILING $RES_DIR WITH ALL VEHICLES"
-        ./bin/createDataMatrix $RES_DIR/dayData $RES_DIR/with_other.mat 1
+      # Scale data and prep for machine learning!
+      if [ ! -f "$CASE_DIR/training_data.mat" ]; then
+        $SCALE_DATA \
+          $CASE_DIR/combined_raw_data.mat \
+          $CASE_DIR/training_data.mat
       fi
 
-      # SCALING
-
-      if [ ! -f $RES_DIR/no_other.scaled.mat ]; then
-        echo "Scaling $RES_DIR/no_other.mat"
-        ./bin/zero_one_scale $RES_DIR/no_other.mat $RES_DIR/no_other.scaled.mat
-      fi
-
-      if [ $MULT -eq 1 ] && [ ! -f $RES_DIR/with_other.scaled.mat ]; then
-        echo "Scaling $RES_DIR/with_other.mat"
-        ./bin/zero_one_scale $RES_DIR/with_other.mat $RES_DIR/with_other.scaled.mat
-      fi
-
-    done
-  done
-done
-
-echo "Time to run batch job training"
+    done # end ENVIRONMENTAL_EFFECTS
+  done # end DAMAGE_CASE
+done # end MULT_VEHICLES

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 This file is responsible for training a machine learning model provided the
 input from the matlab simulation.
@@ -118,12 +117,15 @@ def label_columns(data, one_hot_encoder, fit=False):
   else:
     return one_hot_encoder.transform(labels)
 
+
 def real_and_est_damage_classes_per_day(matrix, classifer, damage_classes):
   X = feature_columns(matrix)
   days = matrix[:, col['day']].tolist()
   actual_damage_classes = matrix[:, col['damage_class']].tolist()
   predicted_damage_classes = [np.argmax(p) for p in classifier.predict(X)]
-  day2prediction_counts = {d: [0 for d in damage_classes] for d in np.unique(days)}
+  day2prediction_counts = {
+      d: [0 for d in damage_classes] for d in np.unique(days)
+  }
   day2actual = {}
 
   logging.info("Prepared counts for %s days", len(day2prediction_counts))
@@ -136,12 +138,12 @@ def real_and_est_damage_classes_per_day(matrix, classifer, damage_classes):
       day2actual[day] = int(actual)
   return day2actual, day2prediction_counts
 
+
 def write_confidence_plot(day2correct, day2classcounts, out_path):
   days = list(day2correct.keys())
 
-  fig, (ax2, ax1) = plt.subplots(2, sharex=True,
-                               figsize=(8, 2.5),
-                               gridspec_kw={'height_ratios': [1, 4]})
+  fig, (ax2, ax1) = plt.subplots(
+      2, sharex=True, figsize=(8, 2.5), gridspec_kw={'height_ratios': [1, 4]})
 
   logging.info("Plotting days:")
   uniq_days = np.unique(days)
@@ -242,9 +244,10 @@ def write_confidence_plot(day2correct, day2classcounts, out_path):
   plt.savefig(out_path, format="png", bbox_inches="tight")
   plt.close()
 
+
 def summarize_classifer_performance(day2actual, day2counts):
-  num_exactly_correct = 0 # True if exactly correct
-  num_boolean_correct = 0 # Healthy vs unhealthy
+  num_exactly_correct = 0  # True if exactly correct
+  num_boolean_correct = 0  # Healthy vs unhealthy
   for day, actual in day2actual.items():
     counts = day2counts[day]
     actual_count = counts[actual]
@@ -261,6 +264,7 @@ def summarize_classifer_performance(day2actual, day2counts):
       num_boolean_correct += 1
   return (num_exactly_correct / len(day2actual),
           num_boolean_correct / len(day2actual))
+
 
 if __name__ == "__main__":
   args = config_args()
@@ -338,7 +342,8 @@ if __name__ == "__main__":
       for damage_class in damage_classes
   ])
 
-  damage_classes, damage_class2count = get_count_per_damage_class(balanced_class_mat)
+  damage_classes, damage_class2count = get_count_per_damage_class(
+      balanced_class_mat)
   logging.info("New Counts per damage_class: %s", str(damage_class2count))
 
   logging.info("Shuffling training_data")
@@ -357,17 +362,26 @@ if __name__ == "__main__":
   classifier = get_classifier(num_training_features)
   stopper = EarlyStopping(monitor="loss")
   classifier.fit(
-      X_train, Y_train, epochs=args.epochs, batch_size=500, callbacks=[stopper], verbose=(1 if args.log_to_stderr else 0))
+      X_train,
+      Y_train,
+      epochs=args.epochs,
+      batch_size=500,
+      callbacks=[stopper],
+      verbose=(1 if args.log_to_stderr else 0))
 
-  train_day2actual, train_day2precited_counts = real_and_est_damage_classes_per_day(training_data, classifier, damage_classes)
-  test_day2actual, test_day2precited_counts = real_and_est_damage_classes_per_day(testing_data, classifier, damage_classes)
+  train_day2actual, train_day2precited_counts = real_and_est_damage_classes_per_day(
+      training_data, classifier, damage_classes)
+  test_day2actual, test_day2precited_counts = real_and_est_damage_classes_per_day(
+      testing_data, classifier, damage_classes)
 
   logging.info("Printing training data performance summary")
-  exact, boolean = summarize_classifer_performance(train_day2actual, train_day2precited_counts)
+  exact, boolean = summarize_classifer_performance(train_day2actual,
+                                                   train_day2precited_counts)
   print("Training Set Exact Confidence:  ", exact)
   print("Training Set Boolean Confidence:", boolean)
   logging.info("Printing testing data performance summary")
-  exact, boolean = summarize_classifer_performance(test_day2actual, test_day2precited_counts)
+  exact, boolean = summarize_classifer_performance(test_day2actual,
+                                                   test_day2precited_counts)
   print("Test Set Exact Confidence:  ", exact)
   print("Test Set Boolean Confidence:", boolean)
 

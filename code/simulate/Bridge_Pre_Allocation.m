@@ -1,13 +1,30 @@
-function exitCode = Bridge_Pre_Allocation(path)
+function exitCode = Bridge_Pre_Allocation(output_path, ...
+                                          Multiple_Vehicles, ...
+                                          Damage_Case, ...
+                                          Environmental_Effects)
+
+% Parse input
+Environmental_Effects = str2num(Environmental_Effects);
+Multiple_Vehicles = str2num(Multiple_Vehicles);
+Damage_Case = str2num(Damage_Case);
+
+assert((Environmental_Effects == 0) || ...
+       (Environmental_Effects == 1));
+% Set enviromental flags based on input
+Temp = Environmental_Effects;
+RainEffects = Environmental_Effects;
+Surface = Environmental_Effects;
+Wind=0;
+
+% 1 if multiple vehicles are considered, 0 if just 1 vehicle is being considered
+assert((Multiple_Vehicles == 0) || ...
+       (Multiple_Vehicles == 1));
+% Determines which damage case being analyzed
+assert((Damage_Case == 1) || ...
+       (Damage_Case == 2));
 
 % Pre-Processing (Change values manually)
-Multiple_Vehicles=1; % 1 if multiple vehicles are considered, 0 if just 1 vehicle is being considered
-Surface=1; % 1 if surface is considered, 0 otherwise
-Wind=0; % 1 if wind effects are considered, 0 otherwise
-Temp=1; % 1 if temp effects are considered, 0 otherwise
-RainEffects=0; % 1 if rain effects are considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
-Damage_Case=2; % Determines which damage case being analyzed
 Bridge=1; % Indicates which bridge is being tested
 lim=720; % Number of days monitoring subject bridge
 NumberElements=10; % Number of elements bridge is divided into
@@ -192,6 +209,6 @@ end
     end
 end
 
-save(path)
+save(output_path)
 exitCode = 0;
 end
