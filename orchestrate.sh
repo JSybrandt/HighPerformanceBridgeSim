@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N runBridge
-#PBS -l select=10:ncpus=24:mem=120gb,walltime=72:00:00
+#PBS -l select=10:ncpus=16:mem=60gb,walltime=72:00:00
 
 # Doop Doop
 #  - - PBS -o /dev/null
