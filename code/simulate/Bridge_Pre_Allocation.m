@@ -87,7 +87,7 @@ Rain(Rain<4)=0;
 Rain(Rain>0)=1;
 end
 if Temp==1
-    Tact=zeros(lim,n); %Actual temperature degrees Celsius
+  Tact=zeros(lim,n); %Actual temperature degrees Celsius
 end
 hour=0;
 if Wind==1

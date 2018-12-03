@@ -2,7 +2,6 @@ function exitCode = SimulateDay(inPath, DaySTR, outPath)
 Day = str2num(DaySTR);
 load(inPath);
 
-
 for ii=1:n % This is the loop for changing vehicle variables over time
 
 % Temperature bounds
@@ -51,9 +50,11 @@ ForceWind(Day,ii)=.5*air_density*WindVelocity(Day,ii)^2*CW*W*l; %(This load will
     end
 end
 
-% Update the hour
-if Td(ii)>=(hour+1)
-    hour=hour+1;
+if Temp==1 || Wind == 1
+  % Update the hour
+  if Td(ii)>=(hour+1)
+      hour=hour+1;
+  end
 end
 
 % Applying damaged modulus to elemental matrix
