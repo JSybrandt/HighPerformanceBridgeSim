@@ -58,14 +58,21 @@ end
 
 % Applying damaged modulus to elemental matrix
 if Damage==1 && Damage_Case==1
-       if Day>=DayDamage1
-           if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .5
-               E_damaged1=E*.5;
-           else
-E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
-           end
-           kb_damaged1=KBeam(E_damaged1*u0,I,l); 
-       end
+  if Day>=DayDamage1
+    coef = sum(ED1(1,1:(Day-DayDamage1+1)))/E;
+    if coef >= .5
+      E_damaged1=E*.5;
+      DamageClass(Day, ii) = 5;
+    else
+      % Overall Damaged Modulus 1
+      E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1))));
+      % Damage class between 0 and 5
+      DamageClass(Day, ii) = floor(coef*10);
+    end
+    kb_damaged1=KBeam(E_damaged1*u0,I,l);
+  else
+    DamageClass(Day, ii) = 0;
+  end
 
 %        if Day>=DayDamage2
 %            if sum(ED2(1,1:(Day-DayDamage2+1)))/E >= .5
@@ -76,23 +83,30 @@ E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
 %            kb_damaged2=KBeam(E_damaged2*u0,I,l);
 %        end
 elseif Damage==1 && Damage_Case==2
-    
+
     if Day>=DayDamage5
 E_damaged1=E-ED1-ED2-ED3-ED4-ED5; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l); 
+kb_damaged1=KBeam(E_damaged1*u0,I,l);
+      DamageClass(Day, ii) = 5;
     elseif Day>=DayDamage4
 E_damaged1=E-ED1-ED2-ED3-ED4; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l); 
+kb_damaged1=KBeam(E_damaged1*u0,I,l);
+      DamageClass(Day, ii) = 4;
     elseif Day>=DayDamage3
-E_damaged1=E-ED1-ED2-ED3; % Overall Damaged Modulus 1 
-kb_damaged1=KBeam(E_damaged1*u0,I,l); 
+E_damaged1=E-ED1-ED2-ED3; % Overall Damaged Modulus 1
+kb_damaged1=KBeam(E_damaged1*u0,I,l);
+      DamageClass(Day, ii) = 3;
     elseif Day>=DayDamage2
-E_damaged1=E-ED1-ED2; % Overall Damaged Modulus 1  
-kb_damaged1=KBeam(E_damaged1*u0,I,l); 
+E_damaged1=E-ED1-ED2; % Overall Damaged Modulus 1
+kb_damaged1=KBeam(E_damaged1*u0,I,l);
+      DamageClass(Day, ii) = 2;
     elseif Day>=DayDamage1
 E_damaged1=E-ED1; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l); 
-    end      
+kb_damaged1=KBeam(E_damaged1*u0,I,l);
+      DamageClass(Day, ii) = 1;
+    else
+      DamageClass(Day, ii) = 0;
+    end
 end
 
 % Healthy elemental matrices
@@ -106,15 +120,15 @@ cor_Mon=zeros(NumberElements,4);
 kk=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
 mm=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
 for i=1:NumberElements
-   cor_Mon(i,:)=ele(i,2:5); 
+   cor_Mon(i,:)=ele(i,2:5);
    kk(:,:,i)=KInsert(kb,cor_Mon(i,:),2*(NumberElements+1));
    if Damage==1 && Damage_Case==1
    if i==DamageLocation % Insert damage state 1
-       if Day>=DayDamage1       
+       if Day>=DayDamage1
    kk(:,:,i)=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
        end
    end
-   
+
 %    if i==DamageLocation(2,1) % Insert damage state 2
 %        if Day>=DayDamage2
 %    kk(:,:,i)=KInsert(kb_damaged2,cor_Mon(i,:),2*(NumberElements+1));
@@ -124,21 +138,21 @@ for i=1:NumberElements
    elseif Damage==1 && Damage_Case==2
        if i==DamageLocation
            if Day>=DayDamage5 || Day>=DayDamage4 || Day>=DayDamage3 || Day>=DayDamage2 ||Day>=DayDamage1
-    kk(:,:,i)=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));              
+    kk(:,:,i)=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
            end
        end
    end
-   
+
  KB=KB+kk(:,:,i); % Beam stiffness matrix
  mm(:,:,i)=KInsert(mb,cor_Mon(i,:),2*(NumberElements+1));
  MB=MB+mm(:,:,i); % Beam mass matrix
 end
 
-% Remove boundary conditions only so we can calculate damping matirx 
+% Remove boundary conditions only so we can calculate damping matirx
 
 [M,K]=boundarycondition(MB,KB,NumberElements);
 ei=eig(K,M); % eigenvalues
-ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s] 
+ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s]
 wn_FEA=ef; % sorted natural angular frequencies
 
 % Beam damping matrix
@@ -154,9 +168,9 @@ if Multiple_Vehicles==1 && number_vehicles(Day,ii)==1
 if row(Day,ii,1)<=3
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Mon=VehicleVariables(row(Day,ii,1),2); % wheel mass of vehicle kg
-elseif row(Day,ii,1)<=7 
+elseif row(Day,ii,1)<=7
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1); 
+mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1);
 else
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-10 10],1,1);
@@ -169,7 +183,7 @@ cw_Mon=VehicleVariables(row(Day,ii,1),5); % Damping of vehicle tire N*s/m
 K_Mon=[kv_Mon, -kv_Mon; -kv_Mon, kv_Mon+kw_Mon];
 M_Mon=[mv_Mon, 0; 0, mw_Mon];
 ei_Mon=eig(K_Mon,M_Mon); % eigenvalues
-ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s] 
+ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s]
 Monitorfv{Day,ii}=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
 
 % Data Storage Matrices
@@ -258,7 +272,7 @@ xe=nodes(J,2); % elment end location
 cor_Mon(j,:)=ele(j,2:5); % Current element coordinate
 
 for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
-    
+
 xc=(xg-xo); % Local position
 xb=xc/l; % Local coordiante
 t=xc/V(Day,ii,1); % Local time
@@ -279,7 +293,7 @@ rch=KInsert2(rc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 RC=RC+rch;
 end
 
-% Load Vectors    
+% Load Vectors
 qu_t=muu*(a1*zv(1,i)+a2*za(1,i))+cuu*(a6*zv(1,i)+a7*za(1,i))-kuu*zu(1,i);
 qw_t=mwu*(a1*zv(1,i)+a2*za(1,i))+cwu*(a6*zv(1,i)+a7*za(1,i))-kwu*zu(1,i);
 pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
@@ -314,11 +328,11 @@ C(:,2*NumberElements+1)=[];
 C(1,:)=[];
 C(:,1)=[];
 
-% Apply boundary conditions to calculate damping matirx 
+% Apply boundary conditions to calculate damping matirx
 [M,K]=boundarycondition(MB1,KB1,NumberElements);
 
 % Global Contact Loads
-PC=pc; 
+PC=pc;
 pch=KInsert2(pc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 PC=PC+pch;
 
@@ -418,7 +432,7 @@ xg=xg+dT*V(Day,ii,1);
 end % end single vehicle loop
 
 % Shifting acceleration data out of time domain and into frequency domain
-Fs = 1/dT; % Sampling frequency                          
+Fs = 1/dT; % Sampling frequency
 t = (0:Kt-1)*dT; % Time vector
 f = Fs*(0:(Kt))/(Kt*2); % Frequency domain
 
@@ -447,9 +461,9 @@ elseif Multiple_Vehicles==1 && number_vehicles(Day,ii)==2
 if row(Day,ii,1)<=3
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Mon=VehicleVariables(row(Day,ii,1),2); % wheel mass of vehicle kg
-elseif row(Day,ii,1)<=7 
+elseif row(Day,ii,1)<=7
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1); 
+mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1);
 else
 mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-10 10],1,1);
@@ -462,15 +476,15 @@ cw_Mon=VehicleVariables(row(Day,ii,1),5); % Damping of vehicle tire N*s/m
 K_Mon=[kv_Mon, -kv_Mon; -kv_Mon, kv_Mon+kw_Mon];
 M_Mon=[mv_Mon, 0; 0, mw_Mon];
 ei_Mon=eig(K_Mon,M_Mon); % eigenvalues
-ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s] 
+ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s]
 Monitorfv{Day,ii}=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
 
 if row(Day,ii,2)<=3
 mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Sec=VehicleVariables(row(Day,ii,2),2); % wheel mass of vehicle kg
-elseif row(Day,ii,2)<=7 
+elseif row(Day,ii,2)<=7
 mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Sec=VehicleVariables(row(Day,ii,2),2)+randi([-3 3],1,1); 
+mw_Sec=VehicleVariables(row(Day,ii,2),2)+randi([-3 3],1,1);
 else
 mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw_Sec=VehicleVariables(row(Day,ii,2),2)+randi([-10 10],1,1);
@@ -483,7 +497,7 @@ cw_Sec=VehicleVariables(row(Day,ii,2),5); % Damping of vehicle tire N*s/m
 K_Sec=[kv_Sec, -kv_Sec; -kv_Sec, kv_Sec+kw_Sec];
 M_Sec=[mv_Sec, 0; 0, mw_Sec];
 ei_Sec=eig(K_Sec,M_Sec); % eigenvalues
-ef_Sec=sort(real(sqrt(ei_Sec))); % sorted natural angular frequencies [rad/s] 
+ef_Sec=sort(real(sqrt(ei_Sec))); % sorted natural angular frequencies [rad/s]
 Secondfv{Day,ii}=ef_Sec/(2*pi); % 1st and second natural frequencies of sprung mass
 
 % Data Storage Matrices
@@ -518,7 +532,7 @@ Kt=Kt_Mon; % Total time for all vehicles to cross bridge
 Kt=Start_Time_Last_Vehicle+Kt_Sec;% Total time for all vehicles to cross bridge
     end
 
-elseif Vehicle_order(1)==2 
+elseif Vehicle_order(1)==2
 Start_Time_Last_Vehicle=randi([1 (Kt_Sec-200)],1,1);
 
     if (Start_Time_Last_Vehicle+Kt_Mon)<=Kt_Sec
@@ -630,7 +644,7 @@ J_Mon=2; % Initial row for monitoring Vehicle nodal matrix
 xo_Mon=nodes(J_Mon-1,2); % Monitoring Vehicle current element start location
 cor_Mon(j_Mon,:)=ele(j_Mon,2:5); % Monitoring Vehicle current element coordinate
 
-xg_Sec=L; % Initial global position of Second Vehicle 
+xg_Sec=L; % Initial global position of Second Vehicle
 j_Sec=1; % Initial row for Second Vehicle elemental matrix
 J_Sec=2; % Initial row for Second Vehicle nodal matrix
 xo_Sec=nodes2(J_Sec-1,2); % Monitoring Vehicle current element start location
@@ -638,9 +652,9 @@ cor_Sec=zeros(NumberElements,4);
 cor_Sec(j_Sec,:)=ele2(j_Sec,2:5); % Monitoring Vehicle current element coordinate
 
 for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
-    
+
 if i<Start_Time_Last_Vehicle
-    
+
     if Vehicle_order(1)==1
 xc_Mon=(xg_Mon-xo_Mon); % Local position of vehicle on bridge
 xb_Mon=xc_Mon/l; % Local coordinate
@@ -662,7 +676,7 @@ t_Sec=xc_Sec/V(Day,ii,2); % Local time
 Nc_Sec(i,:)=[1-3*xb_Sec^2+2*xb_Sec^3, xc_Sec*(1-2*xb_Sec+xb_Sec^2), 3*xb_Sec^2-2*xb_Sec^3, xc_Sec*(xb_Sec^2-xb_Sec)]; % Shape function Row Vector
 Ncd_Sec(i,:)=[-6*V(Day,ii,2)^2*t_Sec/l^2+6*V(Day,ii,2)^3*t_Sec^2/l^3, V(Day,ii,2)-4*V(Day,ii,2)^2*t_Sec/l+3*V(Day,ii,2)^3*t_Sec^2/l^2, 6*V(Day,ii,2)^2*t_Sec/l^2-6*V(Day,ii,2)^3*t_Sec^2/l^3, 3*V(Day,ii,2)^3*t_Sec^2/l^2-2*V(Day,ii,2)^2*t_Sec/l];
 Ncdd_Sec(i,:)=[-6*V(Day,ii,2)^2/l^2+12*V(Day,ii,2)^3*t_Sec/l^3, -4*V(Day,ii,2)^2/l+6*V(Day,ii,2)^3*t_Sec/l^2, 6*V(Day,ii,2)^2/l^2-12*V(Day,ii,2)^3*t_Sec/l^3, 6*V(Day,ii,2)^3*t_Sec/l^2-2*V(Day,ii,2)^2/l];
-Nct_Sec=transpose(Nc_Sec); % Column Vector 
+Nct_Sec=transpose(Nc_Sec); % Column Vector
 
 xc_Mon=0; % Local position of vehicle on bridge
 Nc_Mon(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
@@ -670,9 +684,9 @@ Ncd_Mon(i,:)=[0, 0, 0, 0];
 Ncdd_Mon(i,:)=[0, 0, 0, 0];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
     end
-    
+
 else
-    
+
     if xg_Mon<L
 xc_Mon=(xg_Mon-xo_Mon); % Local position of vehicle on bridge
 xb_Mon=xc_Mon/l; % Local coordinate
@@ -681,14 +695,14 @@ Nc_Mon(i,:)=[1-3*xb_Mon^2+2*xb_Mon^3, xc_Mon*(1-2*xb_Mon+xb_Mon^2), 3*xb_Mon^2-2
 Ncd_Mon(i,:)=[-6*V(Day,ii,1)^2*t_Mon/l^2+6*V(Day,ii,1)^3*t_Mon^2/l^3, V(Day,ii,1)-4*V(Day,ii,1)^2*t_Mon/l+3*V(Day,ii,1)^3*t_Mon^2/l^2, 6*V(Day,ii,1)^2*t_Mon/l^2-6*V(Day,ii,1)^3*t_Mon^2/l^3, 3*V(Day,ii,1)^3*t_Mon^2/l^2-2*V(Day,ii,1)^2*t_Mon/l];
 Ncdd_Mon(i,:)=[-6*V(Day,ii,1)^2/l^2+12*V(Day,ii,1)^3*t_Mon/l^3, -4*V(Day,ii,1)^2/l+6*V(Day,ii,1)^3*t_Mon/l^2, 6*V(Day,ii,1)^2/l^2-12*V(Day,ii,1)^3*t_Mon/l^3, 6*V(Day,ii,1)^3*t_Mon/l^2-2*V(Day,ii,1)^2/l];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
-    else 
+    else
 c_Mon=0; % Local position of vehicle on bridge
 Nc_Mon(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
 Ncd_Mon(i,:)=[0, 0, 0, 0];
 Ncdd_Mon(i,:)=[0, 0, 0, 0];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
     end
-    
+
     if xg_Sec > 0
 xc_Sec=abs((xg_Sec-xo_Sec)); % Local position of vehicle on bridge
 xb_Sec=xc_Sec/l; % Local coordiante
@@ -705,8 +719,8 @@ Ncdd_Sec(i,:)=[0, 0, 0, 0];
 Nct_Sec=transpose(Nc_Sec); % Column Vector
     end
 end
-        
-          
+
+
 if Surface==1
 RC=rc; % Resets Surface Roughness matrix each loop
     if i<Start_Time_Last_Vehicle && Vehicle_order(1)==2
@@ -751,7 +765,7 @@ ddrx_Sec(i)=RoadMatrix(4,1);
     end
 end
 
-% Load Vectors    
+% Load Vectors
 qu_t_Mon=muu_Mon*(a1*zv_Mon(1,i)+a2*za_Mon(1,i))+cuu_Mon*(a6*zv_Mon(1,i)+a7*za_Mon(1,i))-kuu_Mon*zu_Mon(1,i);
 qw_t_Mon=mwu_Mon*(a1*zv_Mon(1,i)+a2*za_Mon(1,i))+cwu_Mon*(a6*zv_Mon(1,i)+a7*za_Mon(1,i))-kwu_Mon*zu_Mon(1,i);
 pc_tdt_Mon=lw\(PSIwu_Mon*PSIuu_Mon\fue_t_dt_Mon-fwe_t_dt_Mon);
@@ -802,11 +816,11 @@ C(:,2*NumberElements+1)=[];
 C(1,:)=[];
 C(:,1)=[];
 
-% Apply boundary conditions to calculate damping matirx 
+% Apply boundary conditions to calculate damping matirx
 [M,K]=boundarycondition(MB1,KB1,NumberElements);
 
 % Global Contact Loads
-PC=pc; 
+PC=pc;
 pch_Mon=KInsert2(pc_tdt_st_Mon,cor_Mon(j_Mon,:),2*(NumberElements+1));
 pch_Sec=KInsert2(pc_tdt_st_Sec,cor_Sec(j_Sec,:),2*(NumberElements+1));
 PC=PC+pch_Mon+pch_Sec;
@@ -939,7 +953,7 @@ elseif i<Start_Time_Last_Vehicle && Vehicle_order(1)==2
 % Update global x position for next loop
 xg_Sec=xg_Sec-dT*V(Day,ii,2);
 elseif i>=Start_Time_Last_Vehicle
-    
+
     if xg_Mon<L
 % Update global x position for next loop
 xg_Mon=xg_Mon+dT*V(Day,ii,1);
@@ -950,7 +964,7 @@ zv_Mon(:,i+1)=[0;0]; % Future Velocity
 
       xg_Mon=L;
     end
- 
+
     if xg_Sec>0
 % Update global x position for next loop
 xg_Sec=xg_Sec-dT*V(Day,ii,2);
@@ -972,7 +986,7 @@ end % end vehicle loop
 % xlabel('Time (s) ');
 % ylabel('Acceleration (m)');
 % plotformat
-% % 
+% %
 % figure(2)
 % set(gcf,'color','white')
 % plot(1:Kt,za_Mon(1,:),'b','linewidth',3);hold on
@@ -996,7 +1010,7 @@ rx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
 drx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
 ddrx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
     end
-    
+
     if (Start_Time_Last_Vehicle+Kt_Sec)>Kt_Mon
 za_Sec(:,end)=[];
 za_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
@@ -1013,7 +1027,7 @@ drx_Mon(:,Kt_Mon:end)=[];
 ddrx_Mon(:,Kt_Mon:end)=[];
     end
 
-elseif Vehicle_order(1)==2 
+elseif Vehicle_order(1)==2
         if (Start_Time_Last_Vehicle+Kt_Mon)<Kt_Sec
 za_Mon(:,Start_Time_Last_Vehicle+Kt_Mon:end)=[];
 rx_Mon(:,Start_Time_Last_Vehicle+Kt_Mon-1:end)=[];
@@ -1040,7 +1054,7 @@ rx_Sec(:,Kt_Sec:end)=[];
 drx_Sec(:,Kt_Sec:end)=[];
 ddrx_Sec(:,Kt_Sec:end)=[];
     end
-    
+
 end
 
 % Test matrix for debugging
@@ -1055,7 +1069,7 @@ end
 % xlabel('Time (s) ');
 % ylabel('Acceleration (m)');
 % plotformat
-% 
+%
 % figure(4)
 % set(gcf,'color','white')
 % plot(0:dT:L/V(Day,ii,1),za_Mon(1,:),'b','linewidth',3);hold on
@@ -1065,7 +1079,7 @@ end
 % plotformat
 
 % Shifting acceleration data out of time domain and into frequency domain
-Fs = 1/dT; % Sampling frequency                          
+Fs = 1/dT; % Sampling frequency
 f_Mon = Fs*(0:(Kt_Mon))/(Kt_Mon*2); % Frequency domain
 f_Sec = Fs*(0:(Kt_Sec))/(Kt_Sec*2); % Frequency domain
 
@@ -1114,19 +1128,19 @@ Other_Vehicle_Road_Profile{Day,ii}=rx_Sec;
 Other_Vehicle_Derivative_Road_Profile{Day,ii}=drx_Sec;
 Other_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx_Sec;
 
-%% End of second section of "If Multiple_Vehicle" loop 
-    
+%% End of second section of "If Multiple_Vehicle" loop
+
 % elseif Multiple_Vehicles==1 && number_vehicles(Day,ii)==3
-%         
+%
 %% Beginning of last section of "If Multiple_Vehicle" loop (This section is for if there is only one vehicle ever being considered)
-else    
+else
     % Vehicle parameters
 if row(Day,ii)<=3
 mv=VehicleVariables(row(Day,ii),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw=VehicleVariables(row(Day,ii),2); % wheel mass of vehicle kg
-elseif row(Day,ii)<=7 
+elseif row(Day,ii)<=7
 mv=VehicleVariables(row(Day,ii),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw=VehicleVariables(row(Day,ii),2)+randi([-3 3],1,1); 
+mw=VehicleVariables(row(Day,ii),2)+randi([-3 3],1,1);
 else
 mv=VehicleVariables(row(Day,ii),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
 mw=VehicleVariables(row(Day,ii),2)+randi([-10 10],1,1);
@@ -1139,7 +1153,7 @@ cw=VehicleVariables(row(Day,ii),5); % Damping of vehicle tire N*s/m
 K_Mon=[kv, -kv; -kv, kv+kw];
 M_Mon=[mv, 0; 0, mw];
 ei_Mon=eig(K_Mon,M_Mon); % eigenvalues
-ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s] 
+ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s]
 Monitorfv{Day,ii}=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
 
 % Data Storage Matrices
@@ -1227,7 +1241,7 @@ xe=nodes(J,2); % elment end location
 cor_Mon(j,:)=ele(j,2:5); % Current element coordinate
 
 for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
-    
+
 xc=(xg-xo); % Local position
 xb=xc/l; % Local coordiante
 t=xc/V(Day,ii); % Local time
@@ -1248,7 +1262,7 @@ rch=KInsert2(rc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 RC=RC+rch;
 end
 
-% Load Vectors    
+% Load Vectors
 qu_t=muu*(a1*zv(1,i)+a2*za(1,i))+cuu*(a6*zv(1,i)+a7*za(1,i))-kuu*zu(1,i);
 qw_t=mwu*(a1*zv(1,i)+a2*za(1,i))+cwu*(a6*zv(1,i)+a7*za(1,i))-kwu*zu(1,i);
 pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
@@ -1283,11 +1297,11 @@ C(:,2*NumberElements+1)=[];
 C(1,:)=[];
 C(:,1)=[];
 
-% Apply boundary conditions to calculate damping matirx 
+% Apply boundary conditions to calculate damping matirx
 [M,K]=boundarycondition(MB1,KB1,NumberElements);
 
 % Global Contact Loads
-PC=pc; 
+PC=pc;
 pch=KInsert2(pc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 PC=PC+pch;
 
@@ -1385,7 +1399,7 @@ end
 xg=xg+dT*V(Day,ii);
 end % end single vehicle loop
 % Shifting acceleration data out of time domain and into frequency domain
-Fs = 1/dT; % Sampling frequency                          
+Fs = 1/dT; % Sampling frequency
 t = (0:Kt-1)*dT; % Time vector
 f = Fs*(0:(Kt))/(Kt*2); % Frequency domain
 
@@ -1403,7 +1417,7 @@ Monitor_Vehicle_Frequency_Data{Day,ii}=f;
 Monitor_Vehicle_Road_Profile{Day,ii}=rx;
 Monitor_Vehicle_Derivative_Road_Profile{Day,ii}=drx;
 Monitor_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx;
-    
+
 end
 
 

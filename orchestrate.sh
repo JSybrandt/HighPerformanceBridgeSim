@@ -11,11 +11,15 @@ module load matlab
 module load gnu-parallel
 
 # Move to location of qsub
-cd $PBS_O_WORKDIR
+if [[ -z "$PBS_O_WORKDIR" ]]; then
+  echo "Warning, you probably want to qsub this."
+else
+  cd $PBS_O_WORKDIR
+fi
 
 # Constants
 SCRATCH="/scratch2/$USER"
-PROJECT="compat_check"
+PROJECT="bridge"
 DAYS_TO_SIMULATE=719
 RECORD_BOTH_CARS=0
 
@@ -73,6 +77,7 @@ for MULT_VEHICLES in 0 1; do
 
       # If the pre_allocation file hasn't been made
       if [ ! -f "$CASE_DIR/pre_allocation.mat" ]; then
+        echo "Running Pre-Allocation"
         # Run this case
         $PRE_ALLOCATION \
           $CASE_DIR/pre_allocation \
@@ -85,6 +90,7 @@ for MULT_VEHICLES in 0 1; do
       mkdir -p $DAY_DIR
       # If the number of days simulated is less than the days we would like
       if [ $( ls $DAY_DIR | wc -l ) -lt $DAYS_TO_SIMULATE ]; then
+        echo "Running days"
         # For each day (1 to $DAYS_TO_SIMULATE) run SimulateDay
         parallel --workdir $PBS_O_WORKDIR --sshloginfile $PBS_NODEFILE \
           "module load matlab; \
@@ -94,7 +100,7 @@ for MULT_VEHICLES in 0 1; do
 
       if [ ! -f "$CASE_DIR/combined_raw_data.mat" ]; then
         $COMBINE_DATA \
-          $CASE_DIR/dayData \
+          $DAY_DIR \
           $CASE_DIR/combined_raw_data \
           $RECORD_BOTH_CARS
       fi

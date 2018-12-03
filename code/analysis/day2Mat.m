@@ -26,23 +26,7 @@ function res = day2Mat(path, use_other)
                'Damage_Case');
 
     function dc = getDamageClass(day)
-      % if Damage_Case == 2
-        if day >=  DayDamage5
-          dc = 5;
-        elseif day >= DayDamage4
-          dc = 4;
-        elseif day >= DayDamage3
-          dc = 3;
-        elseif day >= DayDamage2
-          dc = 2;
-        elseif day >= DayDamage1
-          dc = 1;
-        else
-          dc = 0;
-        end
-      % else
-        % dc = DamageClass(Day, car);
-      % end
+      dc = DamageClass(Day, car);
     end
 
 

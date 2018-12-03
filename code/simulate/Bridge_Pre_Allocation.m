@@ -55,6 +55,10 @@ if Surface==1
 [RoadMatrix]=CompleteSurfaceRoughness(Rclass,L);
 end
 
+if Damage == 1
+  DamageClass=zeros(lim);
+end
+
 % Damage Variables
 if Damage==1 && Damage_Case==1
 DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
@@ -84,8 +88,8 @@ Rain(Rain>0)=1;
 end
 if Temp==1
     Tact=zeros(lim,n); %Actual temperature degrees Celsius
-    hour=0;
 end
+hour=0;
 if Wind==1
     WindVelocity=zeros(lim,n);
     ForceWind=zeros(lim,n);
