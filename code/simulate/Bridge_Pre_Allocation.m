@@ -1,38 +1,18 @@
-function exitCode = Bridge_Pre_Allocation(output_path, ...
-                                          Multiple_Vehicles, ...
-                                          Damage_Case, ...
-                                          Environmental_Effects)
-
-% Parse input
-Environmental_Effects = str2num(Environmental_Effects);
-Multiple_Vehicles = str2num(Multiple_Vehicles);
-Damage_Case = str2num(Damage_Case);
-
-assert((Environmental_Effects == 0) || ...
-       (Environmental_Effects == 1));
-% Set enviromental flags based on input
-Temp = Environmental_Effects;
-RainEffects = Environmental_Effects;
-Surface = Environmental_Effects;
-Wind=0;
-
-% 1 if multiple vehicles are considered, 0 if just 1 vehicle is being considered
-assert((Multiple_Vehicles == 0) || ...
-       (Multiple_Vehicles == 1));
-% Determines which damage case being analyzed
-assert((Damage_Case == 1) || ...
-       (Damage_Case == 2));
-
+clc; clear all;
 % Pre-Processing (Change values manually)
+Multiple_Vehicles=1; % 1 if multiple vehicles are considered, 0 if just 1 vehicle is being considered
+Surface=1; % 1 if surface is considered, 0 otherwise
+Temp=1; % 1 if temp effects are considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
+Damage_Case=2; % Determines which damage case being analyzed
 Bridge=1; % Indicates which bridge is being tested
-lim=720; % Number of days monitoring subject bridge
+lim=361; % Number of days monitoring subject bridge
 NumberElements=10; % Number of elements bridge is divided into
 
 % Load variable arrays
-BridgeVariables=load('data/BridgeVariables.dat');
-VehicleVariables=load('data/VehicleData.dat');
-load('data/USW00003870.hourly.double.mat');
+BridgeVariables=load('BridgeVariables.dat');
+VehicleVariables=load('VehicleData.dat');
+load('USW00003870.hourly.mat'); 
 
 %% Pre Analysis Calculations (Sets up environmental and vehicle parameters)
 Td=0:.016667:24; %Time of day record was taken (Assumes vehicles cross bridge every min of a day)
@@ -55,17 +35,11 @@ if Surface==1
 [RoadMatrix]=CompleteSurfaceRoughness(Rclass,L);
 end
 
-if Damage == 1
-  DamageClass=zeros(lim);
-end
-
 % Damage Variables
 if Damage==1 && Damage_Case==1
 DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
 DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
-% DayDamage2=round(lim*.5)+round(rand(1)*(lim*.67-lim*.5)); % The day second damage is iniciated on bridge
-ED1=[((.05+rand(1)*(.1-.05))*E),.0025*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
-% ED2=[((.1+rand(1)*(.2-.1))*E),.005*rand(1,(lim-DayDamage2+1))*E]; % Damaged Modulus 2
+ED1=[((.01+rand(1)*(.01-.05))*E),.001*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
 elseif Damage==1 && Damage_Case==2
 DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
 DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge
@@ -73,28 +47,18 @@ DayDamage2=round(lim*.35)+round(rand(1)*(lim*.45-lim*.35)); % The day second dam
 DayDamage3=round(lim*.55)+round(rand(1)*(lim*.65-lim*.55)); % The day damage is iniciated on bridge
 DayDamage4=round(lim*.7)+round(rand(1)*(lim*.75-lim*.7)); % The day damage is iniciated on bridge
 DayDamage5=round(lim*.8)+round(rand(1)*(lim*.9-lim*.8)); % The day damage is iniciated on bridge
-ED1=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 1
-ED2=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 2   
-ED3=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 3
-ED4=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 4 
-ED5=((.05+rand(1)*(.1-.05))*E); % Damaged Modulus 5  
+ED1=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 1
+ED2=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 2   
+ED3=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 3
+ED4=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 4 
+ED5=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 5  
 end
 
-% Environment matrices (Rain, Temp, Wind)
-if RainEffects==1
-Rain=[0,0,randi([0 5],1,lim+1)];
-Rain(Rain<4)=0;
-Rain(Rain>0)=1;
-end
+
 if Temp==1
-  Tact=zeros(lim,n); %Actual temperature degrees Celsius
+    Tact=zeros(lim,n); %Actual temperature degrees Celsius
 end
-hour=0;
-if Wind==1
-    WindVelocity=zeros(lim,n);
-    ForceWind=zeros(lim,n);
-    FW=zeros(2*NumberElements,1);
-end
+
 
 % Randomized vehicle selection and speed
 if Multiple_Vehicles==1
@@ -122,19 +86,15 @@ Secondfv=cell(lim,n);
 % learning)
 Monitor_Vehicle_Time=cell(lim,n);
 Monitor_Vehicle_Acceleration=cell(lim,n);
-Monitor_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data.Original=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data.Filtered=cell(lim,n);
 Monitor_Vehicle_Frequency_Data=cell(lim,n);
-Monitor_Vehicle_Road_Profile=cell(lim,n);
-Monitor_Vehicle_Derivative_Road_Profile=cell(lim,n);
-Monitor_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
 
 Other_Vehicle_Time=cell(lim,n);
 Other_Vehicle_Acceleration=cell(lim,n);
-Other_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Other_Vehicle_Frequency_Amp_Data.Original=cell(lim,n);
+Other_Vehicle_Frequency_Amp_Data.Filtered=cell(lim,n);
 Other_Vehicle_Frequency_Data=cell(lim,n);
-Other_Vehicle_Road_Profile=cell(lim,n);
-Other_Vehicle_Derivative_Road_Profile=cell(lim,n);
-Other_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
 
 Start_Time_Following_Vehicle=zeros(lim,n);
 Order_of_Vehicles=cell(lim,n);
@@ -142,7 +102,7 @@ Order_of_Vehicles=cell(lim,n);
 for gg=1:lim
     for hh=1:n
 if number_vehicles(gg,hh)==1
-    row(gg,hh,1)=randi([1 10]);
+    row(gg,hh,1)=randi([1 8]);
     row(gg,hh,2)=0;
 %     row(gg,hh,3)=0;
     
@@ -150,8 +110,8 @@ if number_vehicles(gg,hh)==1
     V(gg,hh,2)=0;
 %     V(gg,hh,3)=0;
 elseif number_vehicles(gg,hh)==2
-    row(gg,hh,1)=randi([1 10]);
-    row(gg,hh,2)=randi([1 10]);
+    row(gg,hh,1)=randi([1 8]);
+    row(gg,hh,2)=randi([1 8]);
 %     row(gg,hh,3)=0;
     
     V(gg,hh,1)=randi([10 25]);
@@ -178,37 +138,19 @@ MonitorSuspensionDamping=zeros(lim,n);
 MonitorWheelDamping=zeros(lim,n);
 Monitorfv=cell(lim,n);
 
-row=randi([1 10],lim,n); % Randomly selects which vehicle is crossing bridge
+row=randi([1 8],lim,n); % Randomly selects which vehicle is crossing bridge
 V=randi([10 25],lim,n); % Speed of vehicle m/s
 
 % Storage matrices and cell arrays (used to store information for machine
 % learning)
 Monitor_Vehicle_Time=cell(lim,n);
 Monitor_Vehicle_Acceleration=cell(lim,n);
-Monitor_Vehicle_Frequency_Amp_Data=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data.Original=cell(lim,n);
+Monitor_Vehicle_Frequency_Amp_Data.Filtered=cell(lim,n);
 Monitor_Vehicle_Frequency_Data=cell(lim,n);
 Monitor_Vehicle_Road_Profile=cell(lim,n);
 Monitor_Vehicle_Derivative_Road_Profile=cell(lim,n);
 Monitor_Vehicle_Other_Derivative_Road_Profile=cell(lim,n);
-end
-
-if RainEffects==1
-    for i=1:lim
-  
-        if i>=3
-if Rain(i)==1 && mu(i-1)>=1.01*BridgeVariables(Bridge,2)
-       mu(i)=1.01*BridgeVariables(Bridge,2);
-elseif Rain(i)==1
-       mu(i)=mu(i-1)+.001*rand(1,1)*BridgeVariables(Bridge,2);
-elseif Rain(i)==0 && Rain(i-1)==1
-   mu(i)=mu(i-1)-.001*rand(1,1)*BridgeVariables(Bridge,2);
-elseif Rain(i)==0 && mu(i-1)>BridgeVariables(Bridge,2)
-           mu(i)=mu(i-1)-.001*rand(1,1)*BridgeVariables(Bridge,2);
-elseif Rain(i)==0 && mu(i-1)<=.99*BridgeVariables(Bridge,2)
-           mu(i)=.99*BridgeVariables(Bridge,2);  
-end
-        end
-    end
 end
 
 % Vehicle Frequency Loop
@@ -228,7 +170,3 @@ end
 % Vehicle(:,i)=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
 % 
 % end
-
-save(output_path)
-exitCode = 0;
-end

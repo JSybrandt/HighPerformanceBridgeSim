@@ -1,8 +1,5 @@
-function exitCode = SimulateDay(inPath, DaySTR, outPath)
-Day = str2num(DaySTR);
-load(inPath);
-
-
+Day=2; % This is the day that is being monitored
+hour=0; % Initial start of monitoring period
 for ii=1:n % This is the loop for changing vehicle variables over time
 
 % Temperature bounds
@@ -30,51 +27,24 @@ u0=1;
 E0=E;
 end
 
-% Wind loads
-if Wind==1
-ce=1.3; % Exposure factor (1.3 for normal structures)
-cfz=-.9; % Lift coefficient (constant value)
-CW=ce*cfz; % Wind load factor
-gas_constant=287.05; %J/(kg*k)
-air_pressure=101325; %Pa (Assuming constant air pressure through out the year)
-air_density=air_pressure/((Tact(Day,ii)+273)*gas_constant); %kg/m^3
-    if hour==23
-TopHourWind=wind(Day+1,2)*0.44704;
-BottomHourWind=wind(Day,hour+1)*0.44704;
-WindVelocity(Day,ii)=BottomHourWind+(Td(ii)-hour)*(TopHourWind-BottomHourWind);
-ForceWind(Day,ii)=.5*air_density*WindVelocity(Day,ii)^2*CW*W*l; %(This load will be applied at every node. It is assumed the wind load is equally distribuuted across the surface of the stucture)
-    else
-TopHourWind=wind(Day,hour+2)*0.44704;
-BottomHourWind=wind(Day,hour+1)*0.44704;
-WindVelocity(Day,ii)=BottomHourWind+(Td(ii)-hour)*(TopHourWind-BottomHourWind);
-ForceWind(Day,ii)=.5*air_density*WindVelocity(Day,ii)^2*CW*W*l; %(This load will be applied at every node. It is assumed the wind load is equally distribuuted across the surface of the stucture)
-    end
-end
-
 % Update the hour
+if Temp==1
 if Td(ii)>=(hour+1)
     hour=hour+1;
+end
 end
 
 % Applying damaged modulus to elemental matrix
 if Damage==1 && Damage_Case==1
        if Day>=DayDamage1
-           if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .5
-               E_damaged1=E*.5;
+           if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .2
+               E_damaged1=E*.2;
            else
 E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
            end
            kb_damaged1=KBeam(E_damaged1*u0,I,l); 
        end
 
-%        if Day>=DayDamage2
-%            if sum(ED2(1,1:(Day-DayDamage2+1)))/E >= .5
-%                E_damaged2=E*.5;
-%            else
-% E_damaged2=(E-sum(ED2(1,1:(Day-DayDamage2+1)))); % Overall Damaged Modulus 1
-%            end
-%            kb_damaged2=KBeam(E_damaged2*u0,I,l);
-%        end
 elseif Damage==1 && Damage_Case==2
     
     if Day>=DayDamage5
@@ -103,35 +73,27 @@ mb=MBeam(mu(Day),l); % Consistent mass matrix for bridge
 KB=zeros(2*(NumberElements+1),2*(NumberElements+1));
 MB=zeros(2*(NumberElements+1),2*(NumberElements+1));
 cor_Mon=zeros(NumberElements,4);
-kk=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
-mm=zeros(2*(NumberElements+1),2*(NumberElements+1),NumberElements);
 for i=1:NumberElements
    cor_Mon(i,:)=ele(i,2:5); 
-   kk(:,:,i)=KInsert(kb,cor_Mon(i,:),2*(NumberElements+1));
+   kk=KInsert(kb,cor_Mon(i,:),2*(NumberElements+1));
    if Damage==1 && Damage_Case==1
    if i==DamageLocation % Insert damage state 1
        if Day>=DayDamage1       
-   kk(:,:,i)=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
+   kk=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
        end
    end
-   
-%    if i==DamageLocation(2,1) % Insert damage state 2
-%        if Day>=DayDamage2
-%    kk(:,:,i)=KInsert(kb_damaged2,cor_Mon(i,:),2*(NumberElements+1));
-%        end
-%    end
 
    elseif Damage==1 && Damage_Case==2
        if i==DamageLocation
            if Day>=DayDamage5 || Day>=DayDamage4 || Day>=DayDamage3 || Day>=DayDamage2 ||Day>=DayDamage1
-    kk(:,:,i)=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));              
+    kk=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));              
            end
        end
    end
    
- KB=KB+kk(:,:,i); % Beam stiffness matrix
- mm(:,:,i)=KInsert(mb,cor_Mon(i,:),2*(NumberElements+1));
- MB=MB+mm(:,:,i); % Beam mass matrix
+ KB=KB+kk; % Beam stiffness matrix
+ mm=KInsert(mb,cor_Mon(i,:),2*(NumberElements+1));
+ MB=MB+mm; % Beam mass matrix
 end
 
 % Remove boundary conditions only so we can calculate damping matirx 
@@ -151,20 +113,12 @@ CB=al*MB+be*KB; % Damping Matrix for beam
 
 if Multiple_Vehicles==1 && number_vehicles(Day,ii)==1
     % Vehicle parameters
-if row(Day,ii,1)<=3
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2); % wheel mass of vehicle kg
-elseif row(Day,ii,1)<=7 
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1); 
-else
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-10 10],1,1);
-end
-kv_Mon=VehicleVariables(row(Day,ii,1),3); %Stiffness of vehicle spring N/m
+mv_Mon=normrnd(VehicleVariables(row(Day,ii,1),1),VehicleVariables(row(Day,ii,1),2));% sprung mass of vehicle kg (Randomly selects 1 of 8 vehicles)
+mw_Mon=normrnd(VehicleVariables(row(Day,ii,1),3),VehicleVariables(row(Day,ii,1),4)); % wheel mass of vehicle kg
+kv_Mon=VehicleVariables(row(Day,ii,1),5); %Stiffness of vehicle spring N/m
 kw_Mon=VehicleVariables(row(Day,ii,1),6); %Stiffness of vehicle tire N/m
-cs_Mon=VehicleVariables(row(Day,ii,1),4); % Damping of vehicle spring N*s/m
-cw_Mon=VehicleVariables(row(Day,ii,1),5); % Damping of vehicle tire N*s/m
+cs_Mon=VehicleVariables(row(Day,ii,1),7); % Damping of vehicle spring N*s/m
+cw_Mon=VehicleVariables(row(Day,ii,1),8); % Damping of vehicle tire N*s/m
 
 K_Mon=[kv_Mon, -kv_Mon; -kv_Mon, kv_Mon+kw_Mon];
 M_Mon=[mv_Mon, 0; 0, mw_Mon];
@@ -212,9 +166,9 @@ AB1=zeros(2*(NumberElements+1),Kt);
 VB1=zeros(2*(NumberElements+1),Kt);
 
 % Initial Condition Vehicle
-zu=zeros(2,Kt-1); % Initial displacement Monitoring Vehicle
-zv=zeros(2,Kt-1);  % Initial velocity of Monitoring Vehicle
-za=zeros(2,Kt-1);  % Initial acceleration of Monitoring Vehicle
+zu=zeros(2,Kt); % Initial displacement Monitoring Vehicle
+zv=zeros(2,Kt);  % Initial velocity of Monitoring Vehicle
+za=zeros(2,Kt);  % Initial acceleration of Monitoring Vehicle
 
 %% Newmark Method
 %Integration Parameters
@@ -234,46 +188,29 @@ cc=lw\(cww-PSIwu*PSIuu\cuw); %Damping contact matrix
 kc=lw\(kww-PSIwu*PSIuu\kuw); %Stiffness contact matrix
 
 %% Pre-allocate matrix sizes
-dz=zeros(1,Kt-1); % Change in upper vehicle displacement
-quc_tdt=zeros(1,Kt);% Uppdated contact Force
-ac=zeros(1,Kt-1);  % Contact acceleration
-dc=zeros(1,Kt-1);  % Contact displacement
-vc=zeros(1,Kt-1);  % Contact velocity
-ab=zeros(4,Kt-1);  % Local element acceleration
-db=zeros(4,Kt-1);  % Local element displacement
-vb=zeros(4,Kt-1);  % Local element velocity
-du=zeros(NumberElements*2,Kt-1); % Change in displacement of global matrices
-Nc=zeros(Kt-1,4);   % Shape function
-Ncd=zeros(Kt-1,4);  % Derivative of shape function
-Ncdd=zeros(Kt-1,4); % Double derivative of shape function
-wn_FEA=zeros(2*NumberElements,Kt-1);
 rc=zeros(2*(NumberElements+1),1);
-rx=zeros(1,Kt-1);
-drx=zeros(1,Kt-1);
-ddrx=zeros(1,Kt-1);
 
 %% Calc global position and shape functions
 xo=nodes(J-1,2); % element start location
-xe=nodes(J,2); % elment end location
 cor_Mon(j,:)=ele(j,2:5); % Current element coordinate
 
 for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
     
 xc=(xg-xo); % Local position
 xb=xc/l; % Local coordiante
-t=xc/V(Day,ii,1); % Local time
-Nc(i,:)=[1-3*xb^2+2*xb^3, xc*(1-2*xb+xb^2), 3*xb^2-2*xb^3, xc*(xb^2-xb)]; % Shape function Row Vector
-Ncd(i,:)=[-6*V(Day,ii,1)^2*t/l^2+6*V(Day,ii,1)^3*t^2/l^3, V(Day,ii,1)-4*V(Day,ii,1)^2*t/l+3*V(Day,ii,1)^3*t^2/l^2, 6*V(Day,ii,1)^2*t/l^2-6*V(Day,ii,1)^3*t^2/l^3, 3*V(Day,ii,1)^3*t^2/l^2-2*V(Day,ii,1)^2*t/l];
-Ncdd(i,:)=[-6*V(Day,ii,1)^2/l^2+12*V(Day,ii,1)^3*t/l^3, -4*V(Day,ii,1)^2/l+6*V(Day,ii,1)^3*t/l^2, 6*V(Day,ii,1)^2/l^2-12*V(Day,ii,1)^3*t/l^3, 6*V(Day,ii,1)^3*t/l^2-2*V(Day,ii,1)^2/l];
+Nc=[1-3*xb.^2+2*xb.^3, xc.*(1-2*xb+xb.^2), 3*xb.^2-2*xb.^3, xc.*(xb.^2-xb)];
+Ncd=[-6*(xc/l^2)+6*(xc.^2/l^3), 1-4*xb+3*xb.^2, 6*(xc/l^2)-6*(xc.^2/l^3), 3*xb.^2-2*xb];
+Ncdd=[-6/l^2+12*xc/l^3, -4/l+6*xc/l^2, 6/l^2-12*xc/l^3, 6*xc/l^2-2/l];
 Nct=transpose(Nc); % Column Vector
 
 % Surface Rougness
 if Surface==1
-Column=find(RoadMatrix(1,:)==round(xg,3));
-rx(i)=RoadMatrix(2,Column(1,1));
-drx(i)=RoadMatrix(3,Column(1,1));
-ddrx(i)=RoadMatrix(4,Column(1,1));
-rc_tdt_st=Nct(:,i)*(V(Day,ii,1)^2*mc*ddrx(i)+V(Day,ii,1)*cc*drx(i)+kc*rx(i)); %Contact force from road irregularities
+difference = abs(RoadMatrix(1,:)-xg);
+[~, Column] = min(difference);
+rx=RoadMatrix(2,Column(1,1));
+drx=RoadMatrix(3,Column(1,1));
+ddrx=RoadMatrix(4,Column(1,1));
+rc_tdt_st=Nct*(V(Day,ii,1)^2*mc*ddrx+V(Day,ii,1)*cc*drx+kc*rx); %Contact force from road irregularities
 RC=rc;
 rch=KInsert2(rc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 RC=RC+rch;
@@ -286,13 +223,13 @@ pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
 qc_t=lw\(PSIwu*PSIuu\qu_t-qw_t);
 
 % Interaction contact matrices
-mc_st=Nct(:,i)*mc*Nc(i,:); %Mass
-cc_st=Nct(:,i)*(2*V(Day,ii,1)*mc*Ncd(i,:)+cc*Nc(i,:)); %Damping
-kc_st=Nct(:,i)*(V(Day,ii,1)^2*mc*Ncdd(i,:)+V(Day,ii,1)*cc*Ncd(i,:)+kc*Nc(i,:)); %Stiffness
+mc_st=Nct*mc*Nc; %Mass
+cc_st=Nct*(2*V(Day,ii,1)*mc*Ncd+cc*Nc); %Damping
+kc_st=Nct*(V(Day,ii,1)^2*mc*Ncdd+V(Day,ii,1)*cc*Ncd+kc*Nc); %Stiffness
 
 % Equivalent nodal loads
-pc_tdt_st=Nct(:,i)*pc_tdt;
-qc_t_st=Nct(:,i)*qc_t;
+pc_tdt_st=Nct*pc_tdt;
+qc_t_st=Nct*qc_t;
 
 % Global Stiffness
 KB1=KB; % resets global matrix each time
@@ -304,18 +241,12 @@ MB1=MB; % resets global matrix each time
 mmh=KInsert(mc_st,cor_Mon(j,:),2*(NumberElements+1));
 MB1=MB1+mmh; % Updated beam stiffness matrix
 
-C=CB; % resets global matrix each time
+CB1=CB; % resets global matrix each time
 cch=KInsert(cc_st,cor_Mon(j,:),2*(NumberElements+1));
-C=C+cch; % Updated beam stiffness matrix
+CB1=CB1+cch; % Updated beam stiffness matrix
 
-% Apply boundary condition for damping matrix
-C(2*NumberElements+1,:)=[];
-C(:,2*NumberElements+1)=[];
-C(1,:)=[];
-C(:,1)=[];
-
-% Apply boundary conditions to calculate damping matirx 
-[M,K]=boundarycondition(MB1,KB1,NumberElements);
+% Apply boundary conditions
+[M,K,C]=boundarycondition(MB1,KB1,NumberElements,CB1);
 
 % Global Contact Loads
 PC=pc; 
@@ -334,17 +265,7 @@ else
 [PC,QC]=bcloads(NumberElements,PC,QC);
 end
 
-if Wind==1
-    FW(:)=ForceWind(Day,ii);
-end
-
-if Wind==1 && Surface==1
-RS=FW-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==1 && Surface==0
-RS=FW-PC-QC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==0 && Surface==1
+if Surface==1
 RS=-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
 LS=(a0*M+a4*a0*C+K);
 else
@@ -353,111 +274,112 @@ LS=(a0*M+a4*a0*C+K);
 end
 
 % Finding unknown displacements
-du(:,i)=LS\RS;
+du=LS\RS;
 
 % Future Disp, Vel, Acc
-UB(:,i+1)=UB(:,i)+du(:,i); % Future displacement
-AB(:,i+1)=a0*du(:,i)-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
+UB(:,i+1)=UB(:,i)+du; % Future displacement
+AB(:,i+1)=a0*du-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
 VB(:,i+1)=VB(:,i)+a3*AB(:,i)+a4*AB(:,i+1); % Future Velocity
 
 % Adding noise to the acceleration of bridge
-AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
+% AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
 
 % Add back constrained dof
-UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i);
-UB1(2*(NumberElements+1),i)=UB(2*NumberElements,i);
-AB1(2:2*NumberElements,i)=AB(1:2*NumberElements-1,i);
-AB1(2*(NumberElements+1),i)=AB(2*NumberElements,i);
-VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i);
-VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i);
+UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i+1);
+UB1(2*(NumberElements+1),i)=UB(2*NumberElements,i+1);
+AB1(2:2*NumberElements,i)=AB(1:2*NumberElements-1,i+1);
+AB1(2*(NumberElements+1),i)=AB(2*NumberElements,i+1);
+VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i+1);
+VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i+1);
 
 % Element displacement, velocity, acceleration
-db(:,i)=UB1(cor_Mon(j,:),i); % Local Displacement
-vb(:,i)=VB1(cor_Mon(j,:),i); % Local Velocity
-ab(:,i)=AB1(cor_Mon(j,:),i); % Local Acceleration
+db=UB1(cor_Mon(j,:),i); % Local Displacement
+vb=VB1(cor_Mon(j,:),i); % Local Velocity
+ab=AB1(cor_Mon(j,:),i); % Local Acceleration
 
 % Contact points
-dc(:,i)=Nc(i,:)*db(:,i); % Contact displacement
-vc(:,i)=V(Day,ii,1)*Ncd(i,:)*db(:,i)+Nc(i,:)*vb(:,i); % Contact velocity
-ac(:,i)=Nc(i,:)*ab(:,i)+2*V(Day,ii,1)*Ncd(i,:)*vb(:,i)+(V(Day,ii,1)^2)*Ncdd(i,:)*db(:,i); % Contact acceleration
+dc=Nc*db; % Contact displacement
+vc=V(Day,ii,1)*Ncd*db+Nc*vb; % Contact velocity
+ac=Nc*ab+2*V(Day,ii,1)*Ncd*vb+(V(Day,ii,1)^2)*Ncdd*db; % Contact acceleration
 
 if Surface==1
 % Future displacement, velocity and acceleration in lower vehicle
-zu(2,i+1)=dc(:,i)+rx(i); % Future displacement
-zv(2,i+1)=vc(:,i)+V(Day,ii,1)*drx(i); % Future Velocity
-za(2,i+1)=ac(:,i)+V(Day,ii,1)^2*ddrx(i); % Future Acceleration
+zu(2,i+1)=dc+rx; % Future displacement
+zv(2,i+1)=vc+V(Day,ii,1)*drx; % Future Velocity
+za(2,i+1)=ac+V(Day,ii,1)^2*ddrx; % Future Acceleration
 else
 % Future displacement, velocity and acceleration in lower vehicle (without
 % surface roughness)
-zu(2,i+1)=dc(:,i); % Future displacement
-zv(2,i+1)=vc(:,i); % Future Velocity
-za(2,i+1)=ac(:,i); % Future Acceleration
+zu(2,i+1)=dc; % Future displacement
+zv(2,i+1)=vc; % Future Velocity
+za(2,i+1)=ac; % Future Acceleration
 end
 
 % Contact Force
-% Vi_Tdt(:,i+1)=pc_tdt+qc_t+(mc*ac(:,i)+cc*vc(:,i)+kc*dc(:,i));
-quc_tdt(:,i+1)=muw*za(2,i+1)+cuw*zv(2,i+1)+kuw*zu(2,i+1);
+% Vi_Tdt(:,i+1)=pc_tdt+qc_t+(mc*ac+cc*vc+kc*dc);
+quc_tdt=muw*za(2,i+1)+cuw*zv(2,i+1)+kuw*zu(2,i+1);
 
 % Change in upper vehicle displacement
-dz(:,i)=PSIuu\(-quc_tdt(:,i+1)+qu_t);
+dz=PSIuu\(-quc_tdt+qu_t);
 
 % Future displacement, vnocity and accneration in upper vehicle
-zu(1,i+1)=zu(1,i)+dz(:,i); % Future displacement
-za(1,i+1)=a0*dz(:,i)-a1*zv(1,i)-a2*za(1,i); % Future Acceleration
+zu(1,i+1)=zu(1,i)+dz; % Future displacement
+za(1,i+1)=a0*dz-a1*zv(1,i)-a2*za(1,i); % Future Acceleration
 zv(1,i+1)=zv(1,i)+a3*za(1,i)+a4*za(1,i+1); % Future Velocity
 
 if xc>=l
 j=j+1;
 J=J+1;
 xo=nodes(J-1,2); % Updated for new element
-xe=nodes(J,2); % Updated for new element
 cor_Mon(j,:)=ele(j,2:5); % New element coordinates
 end
 % Update global x position for next loop
 xg=xg+dT*V(Day,ii,1);
 end % end single vehicle loop
 
+% Adding noise to the acceleration of vehicle
+za=za+(za*(-.025))+randn(2,1).*(za*(.025)-za*(-.025));
+
+
 % Shifting acceleration data out of time domain and into frequency domain
 Fs = 1/dT; % Sampling frequency                          
-t = (0:Kt-1)*dT; % Time vector
-f = Fs*(0:(Kt))/(Kt*2); % Frequency domain
+nFFT = Fs/.1;
+if rem(nFFT,2)>0
+    nFFT = nFFT+1;
+end
+f = Fs*(0:(nFFT/2))/(nFFT); % Frequency domain
 
-% Executing FFT for Vehicle
-fftV_FE=abs(fft(za(1,:),2*Kt));
+% Executing FFt for Upper Vehicle
+fft_V=abs(fft(za,nFFT,2)/nFFT);
+onesided_FE_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-Twosided_FE = fftV_FE/Kt; % two-sided spectrum
-onesided_FE = Twosided_FE(1:Kt+1); % Single-sided spectrum
-onesided_FE(2:end-1) = onesided_FE(2:end-1);
+% Apply Filters
+% Bandpass
+fpass=[4.5 8.5]; 
+Filt_BF = bandpass(za',fpass,Fs);
+fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
+onesided_FE_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
 % % Storage matrices and cell arrays (used to store information for machine
 % % learning)
 Monitor_Vehicle_Time{Day,ii}=T;
 Monitor_Vehicle_Acceleration{Day,ii}=za;
-Monitor_Vehicle_Frequency_Amp_Data{Day,ii}=onesided_FE;
+Monitor_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Original;
+Monitor_Vehicle_Frequency_Amp_Data.Filtered{Day,ii}=onesided_FE_BF;
 Monitor_Vehicle_Frequency_Data{Day,ii}=f;
-Monitor_Vehicle_Road_Profile{Day,ii}=rx;
-Monitor_Vehicle_Derivative_Road_Profile{Day,ii}=drx;
-Monitor_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx;
+
 %% End of first section of "If Multiple_Vehicle" loop
 
 %% Beginning of Second section of "If Multiple_Vehicle" loop
 elseif Multiple_Vehicles==1 && number_vehicles(Day,ii)==2
 
      % Vehicle parameters
-if row(Day,ii,1)<=3
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2); % wheel mass of vehicle kg
-elseif row(Day,ii,1)<=7 
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-3 3],1,1); 
-else
-mv_Mon=VehicleVariables(row(Day,ii,1),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Mon=VehicleVariables(row(Day,ii,1),2)+randi([-10 10],1,1);
-end
-kv_Mon=VehicleVariables(row(Day,ii,1),3); %Stiffness of vehicle spring N/m
+mv_Mon=normrnd(VehicleVariables(row(Day,ii,1),1),VehicleVariables(row(Day,ii,1),2));% sprung mass of vehicle kg (Randomly selects 1 of 8 vehicles)
+mw_Mon=normrnd(VehicleVariables(row(Day,ii,1),3),VehicleVariables(row(Day,ii,1),4)); % wheel mass of vehicle kg
+kv_Mon=VehicleVariables(row(Day,ii,1),5); %Stiffness of vehicle spring N/m
 kw_Mon=VehicleVariables(row(Day,ii,1),6); %Stiffness of vehicle tire N/m
-cs_Mon=VehicleVariables(row(Day,ii,1),4); % Damping of vehicle spring N*s/m
-cw_Mon=VehicleVariables(row(Day,ii,1),5); % Damping of vehicle tire N*s/m
+cs_Mon=VehicleVariables(row(Day,ii,1),7); % Damping of vehicle spring N*s/m
+cw_Mon=VehicleVariables(row(Day,ii,1),8); % Damping of vehicle tire N*s/m
 
 K_Mon=[kv_Mon, -kv_Mon; -kv_Mon, kv_Mon+kw_Mon];
 M_Mon=[mv_Mon, 0; 0, mw_Mon];
@@ -465,20 +387,12 @@ ei_Mon=eig(K_Mon,M_Mon); % eigenvalues
 ef_Mon=sort(real(sqrt(ei_Mon))); % sorted natural angular frequencies [rad/s] 
 Monitorfv{Day,ii}=ef_Mon/(2*pi); % 1st and second natural frequencies of sprung mass
 
-if row(Day,ii,2)<=3
-mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Sec=VehicleVariables(row(Day,ii,2),2); % wheel mass of vehicle kg
-elseif row(Day,ii,2)<=7 
-mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Sec=VehicleVariables(row(Day,ii,2),2)+randi([-3 3],1,1); 
-else
-mv_Sec=VehicleVariables(row(Day,ii,2),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw_Sec=VehicleVariables(row(Day,ii,2),2)+randi([-10 10],1,1);
-end
-kv_Sec=VehicleVariables(row(Day,ii,2),3); %Stiffness of vehicle spring N/m
-kw_Sec=VehicleVariables(row(Day,ii,2),6); %Stiffness of vehicle tire N/m
-cs_Sec=VehicleVariables(row(Day,ii,2),4); % Damping of vehicle spring N*s/m
-cw_Sec=VehicleVariables(row(Day,ii,2),5); % Damping of vehicle tire N*s/m
+mv_Sec=normrnd(VehicleVariables(row(Day,ii,1),1),VehicleVariables(row(Day,ii,1),2));% sprung mass of vehicle kg (Randomly selects 1 of 8 vehicles)
+mw_Sec=normrnd(VehicleVariables(row(Day,ii,1),3),VehicleVariables(row(Day,ii,1),4)); % wheel mass of vehicle kg
+kv_Sec=VehicleVariables(row(Day,ii,1),5); %Stiffness of vehicle spring N/m
+kw_Sec=VehicleVariables(row(Day,ii,1),6); %Stiffness of vehicle tire N/m
+cs_Sec=VehicleVariables(row(Day,ii,1),7); % Damping of vehicle spring N*s/m
+cw_Sec=VehicleVariables(row(Day,ii,1),8); % Damping of vehicle tire N*s/m
 
 K_Sec=[kv_Sec, -kv_Sec; -kv_Sec, kv_Sec+kw_Sec];
 M_Sec=[mv_Sec, 0; 0, mw_Sec];
@@ -589,38 +503,6 @@ cc_Sec=lw\(cww_Sec-PSIwu_Sec*PSIuu_Sec\cuw_Sec); %Monitoring Damping contact mat
 kc_Sec=lw\(kww_Sec-PSIwu_Sec*PSIuu_Sec\kuw_Sec); %Monitoring Stiffness contact matrix
 
 %% Pre-allocate matrix sizes
-dz_Mon=zeros(1,Kt-1); % Change in Monitoring Vehicle upper displacement
-quc_tdt_Mon=zeros(1,Kt);% Uppdated Monitoring Vehicle contact force
-ac_Mon=zeros(1,Kt-1);  % Monitoring Vehicle contact acceleration
-dc_Mon=zeros(1,Kt-1);  % Monitoring Vehicle contact displacement
-vc_Mon=zeros(1,Kt-1);  % Monitoring Vehicle contact velocity
-ab_Mon=zeros(4,Kt-1);  % Monitoring Vehicle Local element acceleration
-db_Mon=zeros(4,Kt-1);  % Monitoring Vehicle Local element displacement
-vb_Mon=zeros(4,Kt-1);  % Monitoring Vehicle Local element velocity
-Nc_Mon=zeros(Kt-1,4);   % Monitoring Vehicle Shape function
-Ncd_Mon=zeros(Kt-1,4);  % Monitoring Vehicle Derivative of shape function
-Ncdd_Mon=zeros(Kt-1,4); % Monitoring Vehicle Double derivative of shape function
-rx_Mon=zeros(1,Kt-1);
-drx_Mon=zeros(1,Kt-1);
-ddrx_Mon=zeros(1,Kt-1);
-
-dz_Sec=zeros(1,Kt-1); % Change in Second Vehicle upper displacement
-quc_tdt_Sec=zeros(1,Kt);% Uppdated Second Vehicle contact force
-ac_Sec=zeros(1,Kt-1);  % Second Vehicle contact acceleration
-dc_Sec=zeros(1,Kt-1);  % Second Vehicle contact displacement
-vc_Sec=zeros(1,Kt-1);  % Second Vehicle contact velocity
-ab_Sec=zeros(4,Kt-1);  % Second Vehicle Local element acceleration
-db_Sec=zeros(4,Kt-1);  % Second Vehicle Local element displacement
-vb_Sec=zeros(4,Kt-1);  % Second Vehicle Local element velocity
-Nc_Sec=zeros(Kt-1,4);   % Second Vehicle Shape function
-Ncd_Sec=zeros(Kt-1,4);  % Second Vehicle Derivative of shape function
-Ncdd_Sec=zeros(Kt-1,4); % Second Vehicle Double derivative of shape function
-rx_Sec=zeros(1,Kt-1);
-drx_Sec=zeros(1,Kt-1);
-ddrx_Sec=zeros(1,Kt-1);
-
-du=zeros(NumberElements*2,Kt-1); % Change in displacement of global matrices
-wn_FEA=zeros(2*NumberElements,Kt-1);
 rc=zeros(2*(NumberElements+1),1);
 
 %% Calc global position and shape functions
@@ -644,30 +526,30 @@ if i<Start_Time_Last_Vehicle
     if Vehicle_order(1)==1
 xc_Mon=(xg_Mon-xo_Mon); % Local position of vehicle on bridge
 xb_Mon=xc_Mon/l; % Local coordinate
-t_Mon=xc_Mon/V(Day,ii,1); % Local time
-Nc_Mon(i,:)=[1-3*xb_Mon^2+2*xb_Mon^3, xc_Mon*(1-2*xb_Mon+xb_Mon^2), 3*xb_Mon^2-2*xb_Mon^3, xc_Mon*(xb_Mon^2-xb_Mon)]; % Shape function Row Vector
-Ncd_Mon(i,:)=[-6*V(Day,ii,1)^2*t_Mon/l^2+6*V(Day,ii,1)^3*t_Mon^2/l^3, V(Day,ii,1)-4*V(Day,ii,1)^2*t_Mon/l+3*V(Day,ii,1)^3*t_Mon^2/l^2, 6*V(Day,ii,1)^2*t_Mon/l^2-6*V(Day,ii,1)^3*t_Mon^2/l^3, 3*V(Day,ii,1)^3*t_Mon^2/l^2-2*V(Day,ii,1)^2*t_Mon/l];
-Ncdd_Mon(i,:)=[-6*V(Day,ii,1)^2/l^2+12*V(Day,ii,1)^3*t_Mon/l^3, -4*V(Day,ii,1)^2/l+6*V(Day,ii,1)^3*t_Mon/l^2, 6*V(Day,ii,1)^2/l^2-12*V(Day,ii,1)^3*t_Mon/l^3, 6*V(Day,ii,1)^3*t_Mon/l^2-2*V(Day,ii,1)^2/l];
+
+Nc_Mon=[1-3*xb_Mon.^2+2*xb_Mon.^3, xc_Mon.*(1-2*xb_Mon+xb_Mon.^2), 3*xb_Mon.^2-2*xb_Mon.^3, xc_Mon.*(xb_Mon.^2-xb_Mon)];
+Ncd_Mon=[-6*(xc_Mon/l^2)+6*(xc_Mon.^2/l^3), 1-4*xb_Mon+3*xb_Mon.^2, 6*(xc_Mon/l^2)-6*(xc_Mon.^2/l^3), 3*xb_Mon.^2-2*xb_Mon];
+Ncdd_Mon=[-6/l^2+12*xc_Mon/l^3, -4/l+6*xc_Mon/l^2, 6/l^2-12*xc_Mon/l^3, 6*xc_Mon/l^2-2/l];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
 
 xc_Sec=0; % Local position of vehicle on bridge
-Nc_Sec(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
-Ncd_Sec(i,:)=[0, 0, 0, 0];
-Ncdd_Sec(i,:)=[0, 0, 0, 0];
+Nc_Sec=[0, 0, 0, 0]; % Shape function Row Vector
+Ncd_Sec=[0, 0, 0, 0];
+Ncdd_Sec=[0, 0, 0, 0];
 Nct_Sec=transpose(Nc_Sec); % Column Vector
     else
 xc_Sec=abs((xg_Sec-xo_Sec)); % Local position of vehicle on bridge
 xb_Sec=xc_Sec/l; % Local coordiante
-t_Sec=xc_Sec/V(Day,ii,2); % Local time
-Nc_Sec(i,:)=[1-3*xb_Sec^2+2*xb_Sec^3, xc_Sec*(1-2*xb_Sec+xb_Sec^2), 3*xb_Sec^2-2*xb_Sec^3, xc_Sec*(xb_Sec^2-xb_Sec)]; % Shape function Row Vector
-Ncd_Sec(i,:)=[-6*V(Day,ii,2)^2*t_Sec/l^2+6*V(Day,ii,2)^3*t_Sec^2/l^3, V(Day,ii,2)-4*V(Day,ii,2)^2*t_Sec/l+3*V(Day,ii,2)^3*t_Sec^2/l^2, 6*V(Day,ii,2)^2*t_Sec/l^2-6*V(Day,ii,2)^3*t_Sec^2/l^3, 3*V(Day,ii,2)^3*t_Sec^2/l^2-2*V(Day,ii,2)^2*t_Sec/l];
-Ncdd_Sec(i,:)=[-6*V(Day,ii,2)^2/l^2+12*V(Day,ii,2)^3*t_Sec/l^3, -4*V(Day,ii,2)^2/l+6*V(Day,ii,2)^3*t_Sec/l^2, 6*V(Day,ii,2)^2/l^2-12*V(Day,ii,2)^3*t_Sec/l^3, 6*V(Day,ii,2)^3*t_Sec/l^2-2*V(Day,ii,2)^2/l];
+
+Nc_Sec=[1-3*xb_Sec.^2+2*xb_Sec.^3, xc_Sec.*(1-2*xb_Sec+xb_Sec.^2), 3*xb_Sec.^2-2*xb_Sec.^3, xc_Sec.*(xb_Sec.^2-xb_Sec)];
+Ncd_Sec=[-6*(xc_Sec/l^2)+6*(xc_Sec.^2/l^3), 1-4*xb_Sec+3*xb_Sec.^2, 6*(xc_Sec/l^2)-6*(xc_Sec.^2/l^3), 3*xb_Sec.^2-2*xb_Sec];
+Ncdd_Sec=[-6/l^2+12*xc_Sec/l^3, -4/l+6*xc_Sec/l^2, 6/l^2-12*xc_Sec/l^3, 6*xc_Sec/l^2-2/l];
 Nct_Sec=transpose(Nc_Sec); % Column Vector 
 
 xc_Mon=0; % Local position of vehicle on bridge
-Nc_Mon(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
-Ncd_Mon(i,:)=[0, 0, 0, 0];
-Ncdd_Mon(i,:)=[0, 0, 0, 0];
+Nc_Mon=[0, 0, 0, 0]; % Shape function Row Vector
+Ncd_Mon=[0, 0, 0, 0];
+Ncdd_Mon=[0, 0, 0, 0];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
     end
     
@@ -676,32 +558,30 @@ else
     if xg_Mon<L
 xc_Mon=(xg_Mon-xo_Mon); % Local position of vehicle on bridge
 xb_Mon=xc_Mon/l; % Local coordinate
-t_Mon=xc_Mon/V(Day,ii,1); % Local time
-Nc_Mon(i,:)=[1-3*xb_Mon^2+2*xb_Mon^3, xc_Mon*(1-2*xb_Mon+xb_Mon^2), 3*xb_Mon^2-2*xb_Mon^3, xc_Mon*(xb_Mon^2-xb_Mon)]; % Shape function Row Vector
-Ncd_Mon(i,:)=[-6*V(Day,ii,1)^2*t_Mon/l^2+6*V(Day,ii,1)^3*t_Mon^2/l^3, V(Day,ii,1)-4*V(Day,ii,1)^2*t_Mon/l+3*V(Day,ii,1)^3*t_Mon^2/l^2, 6*V(Day,ii,1)^2*t_Mon/l^2-6*V(Day,ii,1)^3*t_Mon^2/l^3, 3*V(Day,ii,1)^3*t_Mon^2/l^2-2*V(Day,ii,1)^2*t_Mon/l];
-Ncdd_Mon(i,:)=[-6*V(Day,ii,1)^2/l^2+12*V(Day,ii,1)^3*t_Mon/l^3, -4*V(Day,ii,1)^2/l+6*V(Day,ii,1)^3*t_Mon/l^2, 6*V(Day,ii,1)^2/l^2-12*V(Day,ii,1)^3*t_Mon/l^3, 6*V(Day,ii,1)^3*t_Mon/l^2-2*V(Day,ii,1)^2/l];
+Nc_Mon=[1-3*xb_Mon.^2+2*xb_Mon.^3, xc_Mon.*(1-2*xb_Mon+xb_Mon.^2), 3*xb_Mon.^2-2*xb_Mon.^3, xc_Mon.*(xb_Mon.^2-xb_Mon)];
+Ncd_Mon=[-6*(xc_Mon/l^2)+6*(xc_Mon.^2/l^3), 1-4*xb_Mon+3*xb_Mon.^2, 6*(xc_Mon/l^2)-6*(xc_Mon.^2/l^3), 3*xb_Mon.^2-2*xb_Mon];
+Ncdd_Mon=[-6/l^2+12*xc_Mon/l^3, -4/l+6*xc_Mon/l^2, 6/l^2-12*xc_Mon/l^3, 6*xc_Mon/l^2-2/l];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
     else 
 c_Mon=0; % Local position of vehicle on bridge
-Nc_Mon(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
-Ncd_Mon(i,:)=[0, 0, 0, 0];
-Ncdd_Mon(i,:)=[0, 0, 0, 0];
+Nc_Mon=[0, 0, 0, 0]; % Shape function Row Vector
+Ncd_Mon=[0, 0, 0, 0];
+Ncdd_Mon=[0, 0, 0, 0];
 Nct_Mon=transpose(Nc_Mon); % Column Vector
     end
     
     if xg_Sec > 0
 xc_Sec=abs((xg_Sec-xo_Sec)); % Local position of vehicle on bridge
 xb_Sec=xc_Sec/l; % Local coordiante
-t_Sec=xc_Sec/V(Day,ii,2); % Local time
-Nc_Sec(i,:)=[1-3*xb_Sec^2+2*xb_Sec^3, xc_Sec*(1-2*xb_Sec+xb_Sec^2), 3*xb_Sec^2-2*xb_Sec^3, xc_Sec*(xb_Sec^2-xb_Sec)]; % Shape function Row Vector
-Ncd_Sec(i,:)=[-6*V(Day,ii,2)^2*t_Sec/l^2+6*V(Day,ii,2)^3*t_Sec^2/l^3, V(Day,ii,2)-4*V(Day,ii,2)^2*t_Sec/l+3*V(Day,ii,2)^3*t_Sec^2/l^2, 6*V(Day,ii,2)^2*t_Sec/l^2-6*V(Day,ii,2)^3*t_Sec^2/l^3, 3*V(Day,ii,2)^3*t_Sec^2/l^2-2*V(Day,ii,2)^2*t_Sec/l];
-Ncdd_Sec(i,:)=[-6*V(Day,ii,2)^2/l^2+12*V(Day,ii,2)^3*t_Sec/l^3, -4*V(Day,ii,2)^2/l+6*V(Day,ii,2)^3*t_Sec/l^2, 6*V(Day,ii,2)^2/l^2-12*V(Day,ii,2)^3*t_Sec/l^3, 6*V(Day,ii,2)^3*t_Sec/l^2-2*V(Day,ii,2)^2/l];
-Nct_Sec=transpose(Nc_Sec); % Column Vector
+Nc_Sec=[1-3*xb_Sec.^2+2*xb_Sec.^3, xc_Sec.*(1-2*xb_Sec+xb_Sec.^2), 3*xb_Sec.^2-2*xb_Sec.^3, xc_Sec.*(xb_Sec.^2-xb_Sec)];
+Ncd_Sec=[-6*(xc_Sec/l^2)+6*(xc_Sec.^2/l^3), 1-4*xb_Sec+3*xb_Sec.^2, 6*(xc_Sec/l^2)-6*(xc_Sec.^2/l^3), 3*xb_Sec.^2-2*xb_Sec];
+Ncdd_Sec=[-6/l^2+12*xc_Sec/l^3, -4/l+6*xc_Sec/l^2, 6/l^2-12*xc_Sec/l^3, 6*xc_Sec/l^2-2/l];
+Nct_Sec=transpose(Nc_Sec); % Column Vector 
     else
 xc_Sec=0; % Local position of vehicle on bridge
-Nc_Sec(i,:)=[0, 0, 0, 0]; % Shape function Row Vector
-Ncd_Sec(i,:)=[0, 0, 0, 0];
-Ncdd_Sec(i,:)=[0, 0, 0, 0];
+Nc_Sec=[0, 0, 0, 0]; % Shape function Row Vector
+Ncd_Sec=[0, 0, 0, 0];
+Ncdd_Sec=[0, 0, 0, 0];
 Nct_Sec=transpose(Nc_Sec); % Column Vector
     end
 end
@@ -710,43 +590,45 @@ end
 if Surface==1
 RC=rc; % Resets Surface Roughness matrix each loop
     if i<Start_Time_Last_Vehicle && Vehicle_order(1)==2
-rx_Mon(i)=0;
-drx_Mon(i)=0;
-ddrx_Mon(i)=0;
+rx_Mon=0;
+drx_Mon=0;
+ddrx_Mon=0;
     else
         if xg_Mon<=L
-Column_Mon=find(RoadMatrix(1,:)==round(xg_Mon,3));
-rx_Mon(i)=RoadMatrix(2,Column_Mon(1,1));
-drx_Mon(i)=RoadMatrix(3,Column_Mon(1,1));
-ddrx_Mon(i)=RoadMatrix(4,Column_Mon(1,1));
-rc_tdt_st_Mon=Nct_Mon(:,i)*(V(Day,ii,1)^2*mc_Mon*ddrx_Mon(i)+V(Day,ii,1)*cc_Mon*drx_Mon(i)+kc_Mon*rx_Mon(i)); %Contact force from road irregularities
+difference = abs(RoadMatrix(1,:)-xg_Mon);
+[~, Column_Mon] = min(difference);
+rx_Mon=RoadMatrix(2,Column_Mon(1,1));
+drx_Mon=RoadMatrix(3,Column_Mon(1,1));
+ddrx_Mon=RoadMatrix(4,Column_Mon(1,1));
+rc_tdt_st_Mon=Nct_Mon*(V(Day,ii,1)^2*mc_Mon*ddrx_Mon+V(Day,ii,1)*cc_Mon*drx_Mon+kc_Mon*rx_Mon); %Contact force from road irregularities
 rch=KInsert2(rc_tdt_st_Mon,cor_Mon(j_Mon,:),2*(NumberElements+1));
 RC=RC+rch;
         else
-rx_Mon(i)=RoadMatrix(2,end);
-drx_Mon(i)=RoadMatrix(3,end);
-ddrx_Mon(i)=RoadMatrix(4,end);
+rx_Mon=RoadMatrix(2,end);
+drx_Mon=RoadMatrix(3,end);
+ddrx_Mon=RoadMatrix(4,end);
         end
     end
 
 
     if i<Start_Time_Last_Vehicle && Vehicle_order(1)==1
-rx_Sec(i)=0;
-drx_Sec(i)=0;
-ddrx_Sec(i)=0;
+rx_Sec=0;
+drx_Sec=0;
+ddrx_Sec=0;
     else
         if xg_Sec>=0
-Column_Sec=find(RoadMatrix(1,:)==round(xg_Sec,3));
-rx_Sec(i)=RoadMatrix(2,Column_Sec(1,1));
-drx_Sec(i)=RoadMatrix(3,Column_Sec(1,1));
-ddrx_Sec(i)=RoadMatrix(4,Column_Sec(1,1));
-rc_tdt_st_Sec=Nct_Sec(:,i)*(V(Day,ii,2)^2*mc_Sec*ddrx_Sec(i)+V(Day,ii,2)*cc_Sec*drx_Sec(i)+kc_Sec*rx_Sec(i)); %Contact force from road irregularities
+difference = abs(RoadMatrix(1,:)-xg_Sec);
+[~, Column_Sec] = min(difference);
+rx_Sec=RoadMatrix(2,Column_Sec(1,1));
+drx_Sec=RoadMatrix(3,Column_Sec(1,1));
+ddrx_Sec=RoadMatrix(4,Column_Sec(1,1));
+rc_tdt_st_Sec=Nct_Sec*(V(Day,ii,2)^2*mc_Sec*ddrx_Sec+V(Day,ii,2)*cc_Sec*drx_Sec+kc_Sec*rx_Sec); %Contact force from road irregularities
 rch=KInsert2(rc_tdt_st_Sec,cor_Sec(j_Sec,:),2*(NumberElements+1));
 RC=RC+rch;
         else
-rx_Sec(i)=RoadMatrix(2,1);
-drx_Sec(i)=RoadMatrix(3,1);
-ddrx_Sec(i)=RoadMatrix(4,1);
+rx_Sec=RoadMatrix(2,1);
+drx_Sec=RoadMatrix(3,1);
+ddrx_Sec=RoadMatrix(4,1);
         end
     end
 end
@@ -763,20 +645,20 @@ pc_tdt_Sec=lw\(PSIwu_Sec*PSIuu_Sec\fue_t_dt_Sec-fwe_t_dt_Sec);
 qc_t_Sec=lw\(PSIwu_Sec*PSIuu_Sec\qu_t_Sec-qw_t_Sec);
 
 % Interaction contact matrices
-mc_st_Mon=Nct_Mon(:,i)*mc_Mon*Nc_Mon(i,:); %Mass
-cc_st_Mon=Nct_Mon(:,i)*(2*V(Day,ii,1)*mc_Mon*Ncd_Mon(i,:)+cc_Mon*Nc_Mon(i,:)); %Damping
-kc_st_Mon=Nct_Mon(:,i)*(V(Day,ii,1)^2*mc_Mon*Ncdd_Mon(i,:)+V(Day,ii,1)*cc_Mon*Ncd_Mon(i,:)+kc_Mon*Nc_Mon(i,:)); %Stiffness
+mc_st_Mon=Nct_Mon*mc_Mon*Nc_Mon; %Mass
+cc_st_Mon=Nct_Mon*(2*V(Day,ii,1)*mc_Mon*Ncd_Mon+cc_Mon*Nc_Mon); %Damping
+kc_st_Mon=Nct_Mon*(V(Day,ii,1)^2*mc_Mon*Ncdd_Mon+V(Day,ii,1)*cc_Mon*Ncd_Mon+kc_Mon*Nc_Mon); %Stiffness
 
-mc_st_Sec=Nct_Sec(:,i)*mc_Sec*Nc_Sec(i,:); %Mass
-cc_st_Sec=Nct_Sec(:,i)*(2*V(Day,ii,2)*mc_Sec*Ncd_Sec(i,:)+cc_Sec*Nc_Sec(i,:)); %Damping
-kc_st_Sec=Nct_Sec(:,i)*(V(Day,ii,2)^2*mc_Sec*Ncdd_Sec(i,:)+V(Day,ii,2)*cc_Sec*Ncd_Sec(i,:)+kc_Sec*Nc_Sec(i,:)); %Stiffness
+mc_st_Sec=Nct_Sec*mc_Sec*Nc_Sec; %Mass
+cc_st_Sec=Nct_Sec*(2*V(Day,ii,2)*mc_Sec*Ncd_Sec+cc_Sec*Nc_Sec); %Damping
+kc_st_Sec=Nct_Sec*(V(Day,ii,2)^2*mc_Sec*Ncdd_Sec+V(Day,ii,2)*cc_Sec*Ncd_Sec+kc_Sec*Nc_Sec); %Stiffness
 
 % Equivalent nodal loads
-pc_tdt_st_Mon=Nct_Mon(:,i)*pc_tdt_Mon;
-qc_t_st_Mon=Nct_Mon(:,i)*qc_t_Mon;
+pc_tdt_st_Mon=Nct_Mon*pc_tdt_Mon;
+qc_t_st_Mon=Nct_Mon*qc_t_Mon;
 
-pc_tdt_st_Sec=Nct_Sec(:,i)*pc_tdt_Sec;
-qc_t_st_Sec=Nct_Sec(:,i)*qc_t_Sec;
+pc_tdt_st_Sec=Nct_Sec*pc_tdt_Sec;
+qc_t_st_Sec=Nct_Sec*qc_t_Sec;
 
 % Global Stiffness
 KB1=KB; % resets global matrix each time
@@ -791,19 +673,13 @@ mmh_Sec=KInsert(mc_st_Sec,cor_Sec(j_Sec,:),2*(NumberElements+1));
 MB1=MB1+mmh_Mon+mmh_Sec; % Updated beam stiffness matrix
 
 % Global Damping
-C=CB; % resets global matrix each time
+CB1=CB; % resets global matrix each time
 cch_Mon=KInsert(cc_st_Mon,cor_Mon(j_Mon,:),2*(NumberElements+1));
 cch_Sec=KInsert(cc_st_Sec,cor_Sec(j_Sec,:),2*(NumberElements+1));
-C=C+cch_Mon+cch_Sec; % Updated beam damping matrix
+CB1=CB1+cch_Mon+cch_Sec; % Updated beam damping matrix
 
-% Apply boundary condition for damping matrix
-C(2*NumberElements+1,:)=[];
-C(:,2*NumberElements+1)=[];
-C(1,:)=[];
-C(:,1)=[];
-
-% Apply boundary conditions to calculate damping matirx 
-[M,K]=boundarycondition(MB1,KB1,NumberElements);
+% Apply boundary conditions
+[M,K,C]=boundarycondition(MB1,KB1,NumberElements,CB1);
 
 % Global Contact Loads
 PC=pc; 
@@ -824,17 +700,7 @@ else
 [PC,QC]=bcloads(NumberElements,PC,QC);
 end
 
-if Wind==1
-    FW(:)=ForceWind(Day,ii);
-end
-
-if Wind==1 && Surface==1
-RS=FW-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==1 && Surface==0
-RS=FW-PC-QC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==0 && Surface==1
+if Surface==1
 RS=-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
 LS=(a0*M+a4*a0*C+K);
 else
@@ -843,15 +709,12 @@ LS=(a0*M+a4*a0*C+K);
 end
 
 % Finding unknown displacements
-du(:,i)=LS\RS;
+du=LS\RS;
 
 % Future Disp, Vel, Acc
-UB(:,i+1)=UB(:,i)+du(:,i); % Future displacement
-AB(:,i+1)=a0*du(:,i)-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
+UB(:,i+1)=UB(:,i)+du; % Future displacement
+AB(:,i+1)=a0*du-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
 VB(:,i+1)=VB(:,i)+a3*AB(:,i)+a4*AB(:,i+1); % Future Velocity
-
-% Adding noise to the acceleration of bridge
-% AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
 
 % Add back constrained dof
 UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i);
@@ -862,60 +725,60 @@ VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i);
 VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i);
 
 % Element displacement, velocity, acceleration
-db_Mon(:,i)=UB1(cor_Mon(j_Mon,:),i); % Local Displacement
-vb_Mon(:,i)=VB1(cor_Mon(j_Mon,:),i); % Local Velocity
-ab_Mon(:,i)=AB1(cor_Mon(j_Mon,:),i); % Local Acceleration
+db_Mon=UB1(cor_Mon(j_Mon,:),i); % Local Displacement
+vb_Mon=VB1(cor_Mon(j_Mon,:),i); % Local Velocity
+ab_Mon=AB1(cor_Mon(j_Mon,:),i); % Local Acceleration
 
-db_Sec(:,i)=UB1(cor_Sec(j_Sec,:),i); % Local Displacement
-vb_Sec(:,i)=VB1(cor_Sec(j_Sec,:),i); % Local Velocity
-ab_Sec(:,i)=AB1(cor_Sec(j_Sec,:),i); % Local Acceleration
+db_Sec=UB1(cor_Sec(j_Sec,:),i); % Local Displacement
+vb_Sec=VB1(cor_Sec(j_Sec,:),i); % Local Velocity
+ab_Sec=AB1(cor_Sec(j_Sec,:),i); % Local Acceleration
 
 % Contact points
-dc_Mon(:,i)=Nc_Mon(i,:)*db_Mon(:,i); % Contact displacement
-vc_Mon(:,i)=V(Day,ii,1)*Ncd_Mon(i,:)*db_Mon(:,i)+Nc_Mon(i,:)*vb_Mon(:,i); % Contact velocity
-ac_Mon(:,i)=Nc_Mon(i,:)*ab_Mon(:,i)+2*V(Day,ii,1)*Ncd_Mon(i,:)*vb_Mon(:,i)+(V(Day,ii,1)^2)*Ncdd_Mon(i,:)*db_Mon(:,i); % Contact acceleration
+dc_Mon=Nc_Mon*db_Mon; % Contact displacement
+vc_Mon=V(Day,ii,1)*Ncd_Mon*db_Mon+Nc_Mon*vb_Mon; % Contact velocity
+ac_Mon=Nc_Mon*ab_Mon+2*V(Day,ii,1)*Ncd_Mon*vb_Mon+(V(Day,ii,1)^2)*Ncdd_Mon*db_Mon; % Contact acceleration
 
-dc_Sec(:,i)=Nc_Sec(i,:)*db_Sec(:,i); % Contact displacement
-vc_Sec(:,i)=V(Day,ii,2)*Ncd_Sec(i,:)*db_Sec(:,i)+Nc_Sec(i,:)*vb_Sec(:,i); % Contact velocity
-ac_Sec(:,i)=Nc_Sec(i,:)*ab_Sec(:,i)+2*V(Day,ii,2)*Ncd_Sec(i,:)*vb_Sec(:,i)+(V(Day,ii,2)^2)*Ncdd_Sec(i,:)*db_Sec(:,i); % Contact acceleration
+dc_Sec=Nc_Sec*db_Sec; % Contact displacement
+vc_Sec=V(Day,ii,2)*Ncd_Sec*db_Sec+Nc_Sec*vb_Sec; % Contact velocity
+ac_Sec=Nc_Sec*ab_Sec+2*V(Day,ii,2)*Ncd_Sec*vb_Sec+(V(Day,ii,2)^2)*Ncdd_Sec*db_Sec; % Contact acceleration
 
 
 if Surface==1
 % Future displacement, velocity and acceleration in lower vehicle
-zu_Mon(2,i+1)=dc_Mon(:,i)+rx_Mon(i); % Future displacement
-zv_Mon(2,i+1)=vc_Mon(:,i)+V(Day,ii,1)*drx_Mon(i); % Future Velocity
-za_Mon(2,i+1)=ac_Mon(:,i)+V(Day,ii,1)^2*ddrx_Mon(i); % Future Acceleration
+zu_Mon(2,i+1)=dc_Mon+rx_Mon; % Future displacement
+zv_Mon(2,i+1)=vc_Mon+V(Day,ii,1)*drx_Mon; % Future Velocity
+za_Mon(2,i+1)=ac_Mon+V(Day,ii,1)^2*ddrx_Mon; % Future Acceleration
 
-zu_Sec(2,i+1)=dc_Sec(:,i)+rx_Sec(i); % Future displacement
-zv_Sec(2,i+1)=vc_Sec(:,i)+V(Day,ii,2)*drx_Sec(i); % Future Velocity
-za_Sec(2,i+1)=ac_Sec(:,i)+V(Day,ii,2)^2*ddrx_Sec(i); % Future Acceleration
+zu_Sec(2,i+1)=dc_Sec+rx_Sec; % Future displacement
+zv_Sec(2,i+1)=vc_Sec+V(Day,ii,2)*drx_Sec; % Future Velocity
+za_Sec(2,i+1)=ac_Sec+V(Day,ii,2)^2*ddrx_Sec; % Future Acceleration
 else
 % Future displacement, velocity and acceleration in lower vehicle (without
 % surface roughness)
-zu_Mon(2,i+1)=dc_Mon(:,i); % Future displacement
-zv_Mon(2,i+1)=vc_Mon(:,i); % Future Velocity
-za_Mon(2,i+1)=ac_Mon(:,i); % Future Acceleration
+zu_Mon(2,i+1)=dc_Mon; % Future displacement
+zv_Mon(2,i+1)=vc_Mon; % Future Velocity
+za_Mon(2,i+1)=ac_Mon; % Future Acceleration
 
-zu_Sec(2,i+1)=dc_Sec(:,i); % Future displacement
-zv_Sec(2,i+1)=vc_Sec(:,i); % Future Velocity
-za_Sec(2,i+1)=ac_Sec(:,i); % Future Acceleration
+zu_Sec(2,i+1)=dc_Sec; % Future displacement
+zv_Sec(2,i+1)=vc_Sec; % Future Velocity
+za_Sec(2,i+1)=ac_Sec; % Future Acceleration
 end
 
 % Contact Force
-quc_tdt_Mon(:,i+1)=muw_Mon*za_Mon(2,i+1)+cuw_Mon*zv_Mon(2,i+1)+kuw_Mon*zu_Mon(2,i+1);
-quc_tdt_Sec(:,i+1)=muw_Sec*za_Sec(2,i+1)+cuw_Sec*zv_Sec(2,i+1)+kuw_Sec*zu_Sec(2,i+1);
+quc_tdt_Mon=muw_Mon*za_Mon(2,i+1)+cuw_Mon*zv_Mon(2,i+1)+kuw_Mon*zu_Mon(2,i+1);
+quc_tdt_Sec=muw_Sec*za_Sec(2,i+1)+cuw_Sec*zv_Sec(2,i+1)+kuw_Sec*zu_Sec(2,i+1);
 
 % Change in upper vehicle displacement
-dz_Mon(:,i)=PSIuu_Mon\(-quc_tdt_Mon(:,i+1)+qu_t_Mon);
-dz_Sec(:,i)=PSIuu_Sec\(-quc_tdt_Sec(:,i+1)+qu_t_Sec);
+dz_Mon=PSIuu_Mon\(-quc_tdt_Mon+qu_t_Mon);
+dz_Sec=PSIuu_Sec\(-quc_tdt_Sec+qu_t_Sec);
 
 % Future displacement, vnocity and accneration in upper vehicle
-zu_Mon(1,i+1)=zu_Mon(1,i)+dz_Mon(:,i); % Future displacement
-za_Mon(1,i+1)=a0*dz_Mon(:,i)-a1*zv_Mon(1,i)-a2*za_Mon(1,i); % Future Acceleration
+zu_Mon(1,i+1)=zu_Mon(1,i)+dz_Mon; % Future displacement
+za_Mon(1,i+1)=a0*dz_Mon-a1*zv_Mon(1,i)-a2*za_Mon(1,i); % Future Acceleration
 zv_Mon(1,i+1)=zv_Mon(1,i)+a3*za_Mon(1,i)+a4*za_Mon(1,i+1); % Future Velocity
 
-zu_Sec(1,i+1)=zu_Sec(1,i)+dz_Sec(:,i); % Future displacement
-za_Sec(1,i+1)=a0*dz_Sec(:,i)-a1*zv_Sec(1,i)-a2*za_Sec(1,i); % Future Acceleration
+zu_Sec(1,i+1)=zu_Sec(1,i)+dz_Sec; % Future displacement
+za_Sec(1,i+1)=a0*dz_Sec-a1*zv_Sec(1,i)-a2*za_Sec(1,i); % Future Acceleration
 zv_Sec(1,i+1)=zv_Sec(1,i)+a3*za_Sec(1,i)+a4*za_Sec(1,i+1); % Future Velocity
 
 if xc_Mon>=l
@@ -964,6 +827,10 @@ end
 
 end % end vehicle loop
 
+% Adding noise to the acceleration of vehicles
+za_Mon=za_Mon+(za_Mon*(-.025))+randn(2,1).*(za_Mon*(.025)-za_Mon*(-.025)); 
+za_Sec=za_Sec+(za_Sec*(-.025))+randn(2,1).*(za_Sec*(.025)-za_Sec*(-.025)); % Future Acceleration
+
 % Acceleration plots before excess data is trimmed off the ends
 % figure(1)
 % set(gcf,'color','white')
@@ -979,7 +846,7 @@ end % end vehicle loop
 % title('Monitoring Vehicle Acceleration')
 % xlabel('Time (s) ');
 % ylabel('Acceleration (m)');
-% zplotformat
+% plotformat
 
 %Test matrix for debugging
 % Matrix1=[Kt_Mon, Kt_Sec; length(rx_Mon), length(rx_Sec); length(za_Mon), length(za_Sec)]
@@ -988,57 +855,27 @@ end % end vehicle loop
 if Vehicle_order(1)==1
     if (Start_Time_Last_Vehicle+Kt_Sec)<Kt_Mon
 za_Sec(:,Start_Time_Last_Vehicle+Kt_Sec:end)=[];
-rx_Sec(:,Start_Time_Last_Vehicle+Kt_Sec-1:end)=[];
-drx_Sec(:,Start_Time_Last_Vehicle+Kt_Sec-1:end)=[];
-ddrx_Sec(:,Start_Time_Last_Vehicle+Kt_Sec-1:end)=[];
 za_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-rx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-drx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-ddrx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
     end
     
     if (Start_Time_Last_Vehicle+Kt_Sec)>Kt_Mon
 za_Sec(:,end)=[];
 za_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-rx_Sec(:,end)=[];
-rx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-drx_Sec(:,end)=[];
-drx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
-ddrx_Sec(:,end)=[];
-ddrx_Sec(:,1:Start_Time_Last_Vehicle-1)=[];
 
 za_Mon(:,Kt_Mon+1:end)=[];
-rx_Mon(:,Kt_Mon:end)=[];
-drx_Mon(:,Kt_Mon:end)=[];
-ddrx_Mon(:,Kt_Mon:end)=[];
     end
 
 elseif Vehicle_order(1)==2 
         if (Start_Time_Last_Vehicle+Kt_Mon)<Kt_Sec
 za_Mon(:,Start_Time_Last_Vehicle+Kt_Mon:end)=[];
-rx_Mon(:,Start_Time_Last_Vehicle+Kt_Mon-1:end)=[];
-drx_Mon(:,Start_Time_Last_Vehicle+Kt_Mon-1:end)=[];
-ddrx_Mon(:,Start_Time_Last_Vehicle+Kt_Mon-1:end)=[];
 za_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-rx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-drx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-ddrx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
         end
 
     if (Start_Time_Last_Vehicle+Kt_Mon)>Kt_Sec
 za_Mon(:,end)=[];
 za_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-rx_Mon(:,end)=[];
-rx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-drx_Mon(:,end)=[];
-drx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
-ddrx_Mon(:,end)=[];
-ddrx_Mon(:,1:Start_Time_Last_Vehicle-1)=[];
 
 za_Sec(:,Kt_Sec+1:end)=[];
-rx_Sec(:,Kt_Sec:end)=[];
-drx_Sec(:,Kt_Sec:end)=[];
-ddrx_Sec(:,Kt_Sec:end)=[];
     end
     
 end
@@ -1066,75 +903,55 @@ end
 
 % Shifting acceleration data out of time domain and into frequency domain
 Fs = 1/dT; % Sampling frequency                          
-f_Mon = Fs*(0:(Kt_Mon))/(Kt_Mon*2); % Frequency domain
-f_Sec = Fs*(0:(Kt_Sec))/(Kt_Sec*2); % Frequency domain
+nFFT = Fs/.1;
+if rem(nFFT,2)>0
+    nFFT = nFFT+1;
+end
+f = Fs*(0:(nFFT/2))/(nFFT); % Frequency domain
 
-% Executing FFT for Vehicle
-fftV_FE_Mon=abs(fft(za_Mon(1,:),2*Kt_Mon));
-fftV_FE_Sec=abs(fft(za_Sec(1,:),2*Kt_Sec));
+% Executing FFt for Upper Vehicle
+fft_V=abs(fft(za_Mon,nFFT,2)/nFFT);
+onesided_FE_Mon_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-Twosided_FE_Mon = fftV_FE_Mon/Kt_Mon; % two-sided spectrum
-onesided_FE_Mon = Twosided_FE_Mon(1:Kt_Mon+1); % Single-sided spectrum
-onesided_FE_Mon(2:end-1) = onesided_FE_Mon(2:end-1);
+fft_V=abs(fft(za_Sec,nFFT,2)/nFFT);
+onesided_FE_Sec_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-Twosided_FE_Sec = fftV_FE_Sec/Kt_Sec; % two-sided spectrum
-onesided_FE_Sec = Twosided_FE_Sec(1:Kt_Sec+1); % Single-sided spectrum
-onesided_FE_Sec(2:end-1) = onesided_FE_Sec(2:end-1);
+% Apply Filters
+% Bandpass
+fpass=[4.5 8.5]; 
+Filt_BF = bandpass(za_Mon',fpass,Fs);
+fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
+onesided_FE_Mon_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-% FFT plot to check is frequency domain looks normal
-% Matrix=[rx_Mon(1), rx_Mon(end); rx_Sec(1), rx_Sec(end)]
-% figure(5)
-% set(gcf,'color','white')
-%  semilogy(f_Mon(1:400),onesided_FE_Mon(1:400),'color','b','LineWidth',2);hold on
-%   semilogy(f_Sec(1:400),onesided_FE_Sec(1:400),'color','r','LineWidth',2);hold on
-% set(gca,'fontsize',16);
-% title('Power Spectrum of Vehicle Acceleration','Fontname','Timesnewroman')
-% xlabel('Frequency (Hz)','Fontname','Timesnewroman')
-% ylabel('Spectrum Amplitude','Fontname','Timesnewroman')
-% plotformat
+Filt_BF = bandpass(za_Sec',fpass,Fs);
+fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
+onesided_FE_Sec_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-% Frequency information for vehicle
-% FV_Mon=ef_Mon/(2*pi)
-% FV_Sec=ef_Sec/(2*pi)
 
 % Storage matrices and cell arrays (used to store information for machine learning)
 Monitor_Vehicle_Time{Day,ii}=T_Mon;
 Monitor_Vehicle_Acceleration{Day,ii}=za_Mon;
-Monitor_Vehicle_Frequency_Amp_Data{Day,ii}=onesided_FE_Mon;
-Monitor_Vehicle_Frequency_Data{Day,ii}=f_Mon;
-Monitor_Vehicle_Road_Profile{Day,ii}=rx_Mon;
-Monitor_Vehicle_Derivative_Road_Profile{Day,ii}=drx_Mon;
-Monitor_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx_Mon;
+Monitor_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Mon_Original;
+Monitor_Vehicle_Frequency_Amp_Data.Filtered{Day,ii}=onesided_FE_Mon_BF;
+Monitor_Vehicle_Frequency_Data{Day,ii}=f;
 
 Other_Vehicle_Time{Day,ii}=T_Sec;
 Other_Vehicle_Acceleration{Day,ii}=za_Sec;
-Other_Vehicle_Frequency_Amp_Data{Day,ii}=onesided_FE_Sec;
-Other_Vehicle_Frequency_Data{Day,ii}=f_Sec;
-Other_Vehicle_Road_Profile{Day,ii}=rx_Sec;
-Other_Vehicle_Derivative_Road_Profile{Day,ii}=drx_Sec;
-Other_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx_Sec;
+Other_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Sec_Original;
+Other_Vehicle_Frequency_Amp_Data.Filtered{Day,ii}=onesided_FE_Sec_BF;
+Other_Vehicle_Frequency_Data{Day,ii}=f;
 
 %% End of second section of "If Multiple_Vehicle" loop 
-    
-% elseif Multiple_Vehicles==1 && number_vehicles(Day,ii)==3
-%         
+         
 %% Beginning of last section of "If Multiple_Vehicle" loop (This section is for if there is only one vehicle ever being considered)
 else    
     % Vehicle parameters
-if row(Day,ii)<=3
-mv=VehicleVariables(row(Day,ii),1)+randi([-50 50],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw=VehicleVariables(row(Day,ii),2); % wheel mass of vehicle kg
-elseif row(Day,ii)<=7 
-mv=VehicleVariables(row(Day,ii),1)+randi([-500 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw=VehicleVariables(row(Day,ii),2)+randi([-3 3],1,1); 
-else
-mv=VehicleVariables(row(Day,ii),1)+randi([-1000 500],1,1);% sprung mass of vehicle kg (Randomly selects 1 of 10 vehicles)
-mw=VehicleVariables(row(Day,ii),2)+randi([-10 10],1,1);
-end
-kv=VehicleVariables(row(Day,ii),3); %Stiffness of vehicle spring N/m
-kw=VehicleVariables(row(Day,ii),6); %Stiffness of vehicle tire N/m
-cs=VehicleVariables(row(Day,ii),4); % Damping of vehicle spring N*s/m
-cw=VehicleVariables(row(Day,ii),5); % Damping of vehicle tire N*s/m
+mv=normrnd(VehicleVariables(row(Day,ii,1),1),VehicleVariables(row(Day,ii,1),2));% sprung mass of vehicle kg (Randomly selects 1 of 8 vehicles)
+mw=normrnd(VehicleVariables(row(Day,ii,1),3),VehicleVariables(row(Day,ii,1),4)); % wheel mass of vehicle kg
+kv=VehicleVariables(row(Day,ii,1),5); %Stiffness of vehicle spring N/m
+kw=VehicleVariables(row(Day,ii,1),6); %Stiffness of vehicle tire N/m
+cs=VehicleVariables(row(Day,ii,1),7); % Damping of vehicle spring N*s/m
+cw=VehicleVariables(row(Day,ii,1),8); % Damping of vehicle tire N*s/m
 
 K_Mon=[kv, -kv; -kv, kv+kw];
 M_Mon=[mv, 0; 0, mw];
@@ -1166,7 +983,7 @@ pc=zeros(2*(NumberElements+1),1);
 qc=zeros(2*(NumberElements+1),1);
 
 % Vehicle matricies
-muu=mv; muw=0;      mwu=0;      mww=mw;
+muu=mv; muw=0;          mwu=0;          mww=mw;
 kuu=kv; kuw=-kv;    kwu=-kv;    kww=kv+kw;
 cuu=cs; cuw=-cs;    cwu=-cs;    cww=cs+cw;
 fue_t_dt=0; fwe_t_dt=-9.81*mv-9.81*mw;
@@ -1181,9 +998,9 @@ AB1=zeros(2*(NumberElements+1),Kt);
 VB1=zeros(2*(NumberElements+1),Kt);
 
 % Initial Condition Vehicle
-zu=zeros(2,Kt-1); % Initial displacement Vehicle
-zv=zeros(2,Kt-1);  % Initial velocity of Vehicle
-za=zeros(2,Kt-1);  % Initial acceleration of Vehicle
+zu=zeros(2,Kt); % Initial displacement Vehicle
+zv=zeros(2,Kt);  % Initial velocity of Vehicle
+za=zeros(2,Kt);  % Initial acceleration of Vehicle
 
 %% Newmark Method
 %Integration Parameters
@@ -1203,46 +1020,29 @@ cc=lw\(cww-PSIwu*PSIuu\cuw); %Damping contact matrix
 kc=lw\(kww-PSIwu*PSIuu\kuw); %Stiffness contact matrix
 
 %% Pre-allocate matrix sizes
-dz=zeros(1,Kt-1); % Change in upper vehicle displacement
-quc_tdt=zeros(1,Kt);% Uppdated contact Force
-ac=zeros(1,Kt-1);  % Contact acceleration
-dc=zeros(1,Kt-1);  % Contact displacement
-vc=zeros(1,Kt-1);  % Contact velocity
-ab=zeros(4,Kt-1);  % Local element acceleration
-db=zeros(4,Kt-1);  % Local element displacement
-vb=zeros(4,Kt-1);  % Local element velocity
-du=zeros(NumberElements*2,Kt-1); % Change in displacement of global matrices
-Nc=zeros(Kt-1,4);   % Shape function
-Ncd=zeros(Kt-1,4);  % Derivative of shape function
-Ncdd=zeros(Kt-1,4); % Double derivative of shape function
-wn_FEA=zeros(2*NumberElements,Kt-1);
 rc=zeros(2*(NumberElements+1),1);
-rx=zeros(1,Kt-1);
-drx=zeros(1,Kt-1);
-ddrx=zeros(1,Kt-1);
 
 %% Calc global position and shape functions
 xo=nodes(J-1,2); % element start location
-xe=nodes(J,2); % elment end location
-cor_Mon(j,:)=ele(j,2:5); % Current element coordinate
 
 for i=1:Kt-1 % This loop is for calculating the accleration response for each vehicle crossing
     
 xc=(xg-xo); % Local position
 xb=xc/l; % Local coordiante
 t=xc/V(Day,ii); % Local time
-Nc(i,:)=[1-3*xb^2+2*xb^3, xc*(1-2*xb+xb^2), 3*xb^2-2*xb^3, xc*(xb^2-xb)]; % Shape function Row Vector
-Ncd(i,:)=[-6*V(Day,ii)^2*t/l^2+6*V(Day,ii)^3*t^2/l^3, V(Day,ii)-4*V(Day,ii)^2*t/l+3*V(Day,ii)^3*t^2/l^2, 6*V(Day,ii)^2*t/l^2-6*V(Day,ii)^3*t^2/l^3, 3*V(Day,ii)^3*t^2/l^2-2*V(Day,ii)^2*t/l];
-Ncdd(i,:)=[-6*V(Day,ii)^2/l^2+12*V(Day,ii)^3*t/l^3, -4*V(Day,ii)^2/l+6*V(Day,ii)^3*t/l^2, 6*V(Day,ii)^2/l^2-12*V(Day,ii)^3*t/l^3, 6*V(Day,ii)^3*t/l^2-2*V(Day,ii)^2/l];
+Nc=[1-3*xb^2+2*xb^3, xc*(1-2*xb+xb^2), 3*xb^2-2*xb^3, xc*(xb^2-xb)]; % Shape function Row Vector
+Ncd=[-6*V(Day,ii)^2*t/l^2+6*V(Day,ii)^3*t^2/l^3, V(Day,ii)-4*V(Day,ii)^2*t/l+3*V(Day,ii)^3*t^2/l^2, 6*V(Day,ii)^2*t/l^2-6*V(Day,ii)^3*t^2/l^3, 3*V(Day,ii)^3*t^2/l^2-2*V(Day,ii)^2*t/l];
+Ncdd=[-6*V(Day,ii)^2/l^2+12*V(Day,ii)^3*t/l^3, -4*V(Day,ii)^2/l+6*V(Day,ii)^3*t/l^2, 6*V(Day,ii)^2/l^2-12*V(Day,ii)^3*t/l^3, 6*V(Day,ii)^3*t/l^2-2*V(Day,ii)^2/l];
 Nct=transpose(Nc); % Column Vector
 
 % Surface Rougness
 if Surface==1
-Column=find(RoadMatrix(1,:)==round(xg,3));
-rx(i)=RoadMatrix(2,Column(1,1));
-drx(i)=RoadMatrix(3,Column(1,1));
-ddrx(i)=RoadMatrix(4,Column(1,1));
-rc_tdt_st=Nct(:,i)*(V(Day,ii)^2*mc*ddrx(i)+V(Day,ii)*cc*drx(i)+kc*rx(i)); %Contact force from road irregularities
+difference = abs(RoadMatrix(1,:)-xg);
+[~, Column] = min(difference);
+rx=RoadMatrix(2,Column(1,1));
+drx=RoadMatrix(3,Column(1,1));
+ddrx=RoadMatrix(4,Column(1,1));
+rc_tdt_st=Nct*(V(Day,ii)^2*mc*ddrx+V(Day,ii)*cc*drx+kc*rx); %Contact force from road irregularities
 RC=rc;
 rch=KInsert2(rc_tdt_st,cor_Mon(j,:),2*(NumberElements+1));
 RC=RC+rch;
@@ -1255,13 +1055,13 @@ pc_tdt=lw\(PSIwu*PSIuu\fue_t_dt-fwe_t_dt);
 qc_t=lw\(PSIwu*PSIuu\qu_t-qw_t);
 
 % Interaction contact matrices
-mc_st=Nct(:,i)*mc*Nc(i,:); %Mass
-cc_st=Nct(:,i)*(2*V(Day,ii)*mc*Ncd(i,:)+cc*Nc(i,:)); %Damping
-kc_st=Nct(:,i)*(V(Day,ii)^2*mc*Ncdd(i,:)+V(Day,ii)*cc*Ncd(i,:)+kc*Nc(i,:)); %Stiffness
+mc_st=Nct*mc*Nc; %Mass
+cc_st=Nct*(2*V(Day,ii)*mc*Ncd+cc*Nc); %Damping
+kc_st=Nct*(V(Day,ii)^2*mc*Ncdd+V(Day,ii)*cc*Ncd+kc*Nc); %Stiffness
 
 % Equivalent nodal loads
-pc_tdt_st=Nct(:,i)*pc_tdt;
-qc_t_st=Nct(:,i)*qc_t;
+pc_tdt_st=Nct*pc_tdt;
+qc_t_st=Nct*qc_t;
 
 % Global Stiffness
 KB1=KB; % resets global matrix each time
@@ -1273,18 +1073,12 @@ MB1=MB; % resets global matrix each time
 mmh=KInsert(mc_st,cor_Mon(j,:),2*(NumberElements+1));
 MB1=MB1+mmh; % Updated beam stiffness matrix
 
-C=CB; % resets global matrix each time
+CB1=CB; % resets global matrix each time
 cch=KInsert(cc_st,cor_Mon(j,:),2*(NumberElements+1));
-C=C+cch; % Updated beam stiffness matrix
-
-% Apply boundary condition for damping matrix
-C(2*NumberElements+1,:)=[];
-C(:,2*NumberElements+1)=[];
-C(1,:)=[];
-C(:,1)=[];
+CB1=CB1+cch; % Updated beam stiffness matrix
 
 % Apply boundary conditions to calculate damping matirx 
-[M,K]=boundarycondition(MB1,KB1,NumberElements);
+[M,K,C]=boundarycondition(MB1,KB1,NumberElements,CB1);
 
 % Global Contact Loads
 PC=pc; 
@@ -1303,112 +1097,105 @@ else
 [PC,QC]=bcloads(NumberElements,PC,QC);
 end
 
-if Wind==1
-    FW(:)=ForceWind(Day,ii);
-end
 
-if Wind==1 && Surface==1
-RS=FW-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==1 && Surface==0
-RS=FW-PC-QC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
-elseif Wind==0 && Surface==1
-RS=-PC-QC-RC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
+if Surface==1
+RS=-PC-QC-RC-K*UB(:,i)+M*(a1*VB(:,i)+a2*AB(:,i))+C*(a6*VB(:,i)+a7*AB(:,i));
+LS=(a0*M+a5*C+K);
 else
-RS=-PC-QC-K*UB(:,i)-(-a1*M+C-a1*a4*C)*VB(:,i)-(-a2*M+a3*C-a4*a2*C)*AB(:,i);
-LS=(a0*M+a4*a0*C+K);
+RS=-PC-QC-K*UB(:,i)+M*(a1*VB(:,i)+a2*AB(:,i))+C*(a6*VB(:,i)+a7*AB(:,i));
+LS=(a0*M+a5*C+K);
 end
 
 % Finding unknown displacements
-du(:,i)=LS\RS;
+du=LS\RS;
 
 % Future Disp, Vel, Acc
-UB(:,i+1)=UB(:,i)+du(:,i); % Future displacement
-AB(:,i+1)=a0*du(:,i)-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
+UB(:,i+1)=UB(:,i)+du; % Future displacement
+AB(:,i+1)=a0*du-a1*VB(:,i)-a2*AB(:,i); % Future Acceleration
 VB(:,i+1)=VB(:,i)+a3*AB(:,i)+a4*AB(:,i+1); % Future Velocity
 
 % Adding noise to the acceleration of bridge
-AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
+% AB(:,i+1)=AB(:,i+1)+(AB(:,i+1)*(-.025))+randn(2*NumberElements,1).*(AB(:,i+1)*(.025)-AB(:,i+1)*(-.025)); % Future Acceleration
 
 % Add back constrained dof
-UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i);
-UB1(2*(NumberElements+1),i)=UB(2*NumberElements,i);
-AB1(2:2*NumberElements,i)=AB(1:2*NumberElements-1,i);
-AB1(2*(NumberElements+1),i)=AB(2*NumberElements,i);
-VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i);
-VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i);
+UB1(2:2*NumberElements,i)=UB(1:2*NumberElements-1,i+1);
+UB1(2*(NumberElements+1),i)=UB(2*NumberElements,i+1);
+AB1(2:2*NumberElements,i)=AB(1:2*NumberElements-1,i+1);
+AB1(2*(NumberElements+1),i)=AB(2*NumberElements,i+1);
+VB1(2:2*NumberElements,i)=VB(1:2*NumberElements-1,i+1);
+VB1(2*(NumberElements+1),i)=VB(2*NumberElements,i+1);
 
 % Element displacement, velocity, acceleration
-db(:,i)=UB1(cor_Mon(j,:),i); % Local Displacement
-vb(:,i)=VB1(cor_Mon(j,:),i); % Local Velocity
-ab(:,i)=AB1(cor_Mon(j,:),i); % Local Acceleration
+db=UB1(cor_Mon(j,:),i); % Local Displacement
+vb=VB1(cor_Mon(j,:),i); % Local Velocity
+ab=AB1(cor_Mon(j,:),i); % Local Acceleration
 
 % Contact points
-dc(:,i)=Nc(i,:)*db(:,i); % Contact displacement
-vc(:,i)=V(Day,ii)*Ncd(i,:)*db(:,i)+Nc(i,:)*vb(:,i); % Contact velocity
-ac(:,i)=Nc(i,:)*ab(:,i)+2*V(Day,ii)*Ncd(i,:)*vb(:,i)+(V(Day,ii)^2)*Ncdd(i,:)*db(:,i); % Contact acceleration
+dc=Nc*db; % Contact displacement
+vc=V(Day,ii)*Ncd*db+Nc*vb; % Contact velocity
+ac=Nc*ab+2*V(Day,ii)*Ncd*vb+(V(Day,ii)^2)*Ncdd*db; % Contact acceleration
 
 if Surface==1
 % Future displacement, velocity and acceleration in lower vehicle
-zu(2,i+1)=dc(:,i)+rx(i); % Future displacement
-zv(2,i+1)=vc(:,i)+V(Day,ii)*drx(i); % Future Velocity
-za(2,i+1)=ac(:,i)+V(Day,ii)^2*ddrx(i); % Future Acceleration
+zu(2,i+1)=dc+rx; % Future displacement
+zv(2,i+1)=vc+V(Day,ii)*drx; % Future Velocity
+za(2,i+1)=ac+V(Day,ii)^2*ddrx; % Future Acceleration
 else
 % Future displacement, velocity and acceleration in lower vehicle (without
 % surface roughness)
-zu(2,i+1)=dc(:,i); % Future displacement
-zv(2,i+1)=vc(:,i); % Future Velocity
-za(2,i+1)=ac(:,i); % Future Acceleration
+zu(2,i+1)=dc; % Future displacement
+zv(2,i+1)=vc; % Future Velocity
+za(2,i+1)=ac; % Future Acceleration
 end
 
 % Contact Force
-quc_tdt(:,i+1)=muw*za(2,i+1)+cuw*zv(2,i+1)+kuw*zu(2,i+1);
+quc_tdt=muw*za(2,i+1)+cuw*zv(2,i+1)+kuw*zu(2,i+1);
 
 % Change in upper vehicle displacement
-dz(:,i)=PSIuu\(-quc_tdt(:,i+1)+qu_t);
+dz=PSIuu\(-quc_tdt+qu_t);
 
 % Future displacement, vnocity and accneration in upper vehicle
-zu(1,i+1)=zu(1,i)+dz(:,i); % Future displacement
-za(1,i+1)=a0*dz(:,i)-a1*zv(1,i)-a2*za(1,i); % Future Acceleration
+zu(1,i+1)=zu(1,i)+dz; % Future displacement
+za(1,i+1)=a0*dz-a1*zv(1,i)-a2*za(1,i); % Future Acceleration
 zv(1,i+1)=zv(1,i)+a3*za(1,i)+a4*za(1,i+1); % Future Velocity
 
 if xc>=l
 j=j+1;
 J=J+1;
 xo=nodes(J-1,2); % Updated for new element
-xe=nodes(J,2); % Updated for new element
 cor_Mon(j,:)=ele(j,2:5); % New element coordinates
 end
 % Update global x position for next loop
 xg=xg+dT*V(Day,ii);
 end % end single vehicle loop
+
 % Shifting acceleration data out of time domain and into frequency domain
 Fs = 1/dT; % Sampling frequency                          
-t = (0:Kt-1)*dT; % Time vector
-f = Fs*(0:(Kt))/(Kt*2); % Frequency domain
+nFFT = Fs/.1;
+if rem(nFFT,2)>0
+    nFFT = nFFT+1;
+end
+f = Fs*(0:(nFFT/2))/(nFFT); % Frequency domain
 
-% Executing FFT for Vehicle
-fftV_FE=abs(fft(za(1,:),2*Kt));
+% Executing FFt for Upper Vehicle
+fft_V=abs(fft(za,nFFT,2)/nFFT);
+onesided_FE_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
-Twosided_FE = fftV_FE/Kt; % two-sided spectrum
-onesided_FE = Twosided_FE(1:Kt+1); % Single-sided spectrum
-onesided_FE(2:end-1) = onesided_FE(2:end-1);
+% Apply Filters
+% Bandpass
+fpass=[4.5 8.5]; 
+Filt_BF = bandpass(za',fpass,Fs);
+fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
+onesided_FE_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
 Monitor_Vehicle_Time{Day,ii}=T;
 Monitor_Vehicle_Acceleration{Day,ii}=za;
-Monitor_Vehicle_Frequency_Amp_Data{Day,ii}=onesided_FE;
+Monitor_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Original;
+Monitor_Vehicle_Frequency_Amp_Data.Filtered{Day,ii}=onesided_FE_BF;
 Monitor_Vehicle_Frequency_Data{Day,ii}=f;
-Monitor_Vehicle_Road_Profile{Day,ii}=rx;
-Monitor_Vehicle_Derivative_Road_Profile{Day,ii}=drx;
-Monitor_Vehicle_Other_Derivative_Road_Profile{Day,ii}=ddrx;
+
     
 end
 
-
 end % end day loop
 
-save(outPath)
-exitCode = 0;
-end
