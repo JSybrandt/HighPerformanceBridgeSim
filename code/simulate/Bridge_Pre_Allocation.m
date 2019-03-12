@@ -1,12 +1,17 @@
 function exitCode = Bridge_Pre_Allocation(output_path, ...
                                           Multiple_Vehicles, ...
                                           Damage_Case, ...
-                                          Environmental_Effects)
+                                          Environmental_Effects, ...
+                                          num_days, ...
+                                          weather_data_path, ...
+                                          bridge_data_path, ...
+                                          vehicle_data_path)
 
 % Parse input
 Environmental_Effects = str2num(Environmental_Effects);
 Multiple_Vehicles = str2num(Multiple_Vehicles);
 Damage_Case = str2num(Damage_Case);
+num_days = str2num(num_days);
 
 assert((Environmental_Effects == 0) || ...
        (Environmental_Effects == 1));
@@ -20,18 +25,20 @@ assert((Multiple_Vehicles == 0) || ...
 assert((Damage_Case == 1) || ...
        (Damage_Case == 2));
 
+assert(num_days > 0);
+lim=num_days;
+
+
 % Pre-Processing (Change values manually)
 Surface=1; % 1 if surface is considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
 Bridge=1; % Indicates which bridge is being tested
-lim=730; % Number of days monitoring subject bridge
 NumberElements=10; % Number of elements bridge is divided into
 
 % Load variable arrays
-BridgeVariables=load('BridgeVariables.dat');
-VehicleVariables=load('VehicleData.dat');
-% Loads weather
-load('weather.mat');
+BridgeVariables=load(bridge_data_path);
+VehicleVariables=load(vehicle_data_path);
+load(weather_data_path);
 
 %% Pre Analysis Calculations (Sets up environmental and vehicle parameters)
 Td=0:.016667:24; %Time of day record was taken (Assumes vehicles cross bridge every min of a day)
@@ -44,7 +51,7 @@ l=L/NumberElements; % Length of each individual element
 CN=(NumberElements+2); % Central node of bridge
 E=BridgeVariables(Bridge,3); % Modulus of elasticity of bridge N/m^2
 I=BridgeVariables(Bridge,4); % Moment of Inertia m^4
-mu(1:(lim-1))=BridgeVariables(Bridge,2); % mass per unit length kg/m
+mu(1:(lim))=BridgeVariables(Bridge,2); % mass per unit length kg/m
 bbeta=BridgeVariables(Bridge,5); % Damping of bridge
 Rclass=BridgeVariables(Bridge,7);% Values For ISO Road Roughness Classification, from 3 to 9
 [ele, ele2, nodes, nodes2]=element(NumberElements,l,L,Multiple_Vehicles);
