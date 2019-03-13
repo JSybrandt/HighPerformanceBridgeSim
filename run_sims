@@ -1,7 +1,7 @@
 #!/bin/bash
 
 FLAG=$1
-DAYS_TO_SIM=${DAYS_TO_SIM:-710}
+DAYS_TO_SIM=${DAYS_TO_SIM:-730}
 JOBS_PER_NODE=${JOBS_PER_NODE:-12}
 SCRATCH_DIR="/scratch4/$USER/bridge_sim"
 mkdir -p $SCRATCH_DIR

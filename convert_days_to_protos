@@ -1,0 +1,61 @@
+#!/bin/bash
+
+SIM_BASE=$1
+FLAG=$2
+
+JOBS_PER_NODE=${JOBS_PER_NODE:-16}
+
+if [[ ! -d $SIM_BASE ]]; then
+  echo "Must supply directory containing sims"
+  echo "Usage: ./convert_days_to_protos path [--dry-run]"
+  exit 1
+fi
+
+MODULE_REF_FILE="/home/jsybran/module_groups/bridge_proj"
+CONDA_PREP_FILE=~/anaconda3/etc/profile.d/conda.sh
+source $CONDA_PREP_FILE
+source $MODULE_REF_FILE
+
+PROJ_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+CONV_BIN=$PROJ_DIR/code/convert_mat_to_proto/convert_mat_to_proto
+
+CONVERT_DESCRIPTION=$(mktemp)
+for SIM_DIR in $(ls -d $SIM_BASE/*); do
+  MAT_DIR=$SIM_DIR/daily_sim
+  if [[ ! -d $MAT_DIR ]]; then
+    echo "Failed to find $MAT_DIR"
+    exit 1
+  fi
+  PROTO_DIR=$SIM_DIR/daily_proto
+  mkdir -p $PROTO_DIR
+  for MAT_FILE in $(ls $MAT_DIR/*.mat); do
+    PROTO_FILE="$PROTO_DIR/$(basename $MAT_FILE .mat).proto_stream"
+    if [[ -f $PROTO_FILE ]]; then
+      echo "ERROR: $PROTO_FILE ALREADY EXISTS"
+      exit 1
+    fi
+    echo $MAT_FILE $PROTO_FILE >> $CONVERT_DESCRIPTION
+  done
+done
+
+if [[ $FLAG = '--dry-run' ]]; then
+  echo "DRY RUN"
+  cat $CONVERT_DESCRIPTION
+else
+  # Only one job per node because compile is multi-threaded
+  parallel \
+    --sshloginfile "$PBS_NODEFILE" \
+    --workdir $PROJ_DIR \
+    -j $JOBS_PER_NODE \
+    --colsep ' ' \
+    """
+    IN_MAT={1}
+    OUT_PROTO={2}
+    source $CONDA_PREP_FILE
+    source $MODULE_REF_FILE
+    $CONV_BIN \
+      \$IN_MAT \
+      \$OUT_PROTO
+    """ < $CONVERT_DESCRIPTION
+fi
+rm $CONVERT_DESCRIPTION
