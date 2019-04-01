@@ -65,7 +65,7 @@ end
 if Damage==1 && Damage_Case==1
   DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
   DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
-  ED1=[((.01+rand(1)*(.01-.05))*E),.001*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
+  ED1=[((.01+rand(1)*(.02-.01))*E),.001*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
 elseif Damage==1 && Damage_Case==2
   DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
   DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge

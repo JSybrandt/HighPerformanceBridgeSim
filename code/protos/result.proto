@@ -19,4 +19,5 @@ message Trial {
   repeated FftPoint fft_original = 4;
   repeated FftPoint fft_filtered = 5;
   optional bool is_monitor = 6;
+  optional int32 damage_class = 7;
 }

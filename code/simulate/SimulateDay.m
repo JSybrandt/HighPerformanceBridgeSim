@@ -39,7 +39,7 @@ end
 if Damage==1 && Damage_Case==1
        if Day>=DayDamage1
            if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .2
-               E_damaged1=E*.2;
+               E_damaged1=E*.8;
            else
 E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
            end

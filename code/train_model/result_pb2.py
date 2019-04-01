@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='result.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\x0cresult.proto\"C\n\x08\x46\x66tPoint\x12\x11\n\tfrequency\x18\x01 \x01(\x02\x12\x11\n\tupper_amp\x18\x02 \x01(\x02\x12\x11\n\tlower_amp\x18\x03 \x01(\x02\"A\n\x0bMeasurement\x12\x0c\n\x04time\x18\x01 \x01(\x02\x12\x11\n\tupper_acc\x18\x02 \x01(\x02\x12\x11\n\tlower_acc\x18\x03 \x01(\x02\"\xa2\x01\n\x05Trial\x12\x0b\n\x03\x64\x61y\x18\x01 \x01(\x05\x12\x12\n\nstart_time\x18\x02 \x01(\x02\x12\"\n\x0cmeasurements\x18\x03 \x03(\x0b\x32\x0c.Measurement\x12\x1f\n\x0c\x66\x66t_original\x18\x04 \x03(\x0b\x32\t.FftPoint\x12\x1f\n\x0c\x66\x66t_filtered\x18\x05 \x03(\x0b\x32\t.FftPoint\x12\x12\n\nis_monitor\x18\x06 \x01(\x08')
+  serialized_pb=_b('\n\x0cresult.proto\"C\n\x08\x46\x66tPoint\x12\x11\n\tfrequency\x18\x01 \x01(\x02\x12\x11\n\tupper_amp\x18\x02 \x01(\x02\x12\x11\n\tlower_amp\x18\x03 \x01(\x02\"A\n\x0bMeasurement\x12\x0c\n\x04time\x18\x01 \x01(\x02\x12\x11\n\tupper_acc\x18\x02 \x01(\x02\x12\x11\n\tlower_acc\x18\x03 \x01(\x02\"\xb8\x01\n\x05Trial\x12\x0b\n\x03\x64\x61y\x18\x01 \x01(\x05\x12\x12\n\nstart_time\x18\x02 \x01(\x02\x12\"\n\x0cmeasurements\x18\x03 \x03(\x0b\x32\x0c.Measurement\x12\x1f\n\x0c\x66\x66t_original\x18\x04 \x03(\x0b\x32\t.FftPoint\x12\x1f\n\x0c\x66\x66t_filtered\x18\x05 \x03(\x0b\x32\t.FftPoint\x12\x12\n\nis_monitor\x18\x06 \x01(\x08\x12\x14\n\x0c\x64\x61mage_class\x18\x07 \x01(\x05')
 )
 
 
@@ -164,6 +164,13 @@ _TRIAL = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='damage_class', full_name='Trial.damage_class', index=6,
+      number=7, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -177,7 +184,7 @@ _TRIAL = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=153,
-  serialized_end=315,
+  serialized_end=337,
 )
 
 _TRIAL.fields_by_name['measurements'].message_type = _MEASUREMENT

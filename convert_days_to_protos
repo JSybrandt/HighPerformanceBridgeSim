@@ -3,7 +3,7 @@
 SIM_BASE=$1
 FLAG=$2
 
-JOBS_PER_NODE=${JOBS_PER_NODE:-16}
+JOBS_PER_NODE=${JOBS_PER_NODE:-20}
 
 if [[ ! -d $SIM_BASE ]]; then
   echo "Must supply directory containing sims"
@@ -30,11 +30,9 @@ for SIM_DIR in $(ls -d $SIM_BASE/*); do
   mkdir -p $PROTO_DIR
   for MAT_FILE in $(ls $MAT_DIR/*.mat); do
     PROTO_FILE="$PROTO_DIR/$(basename $MAT_FILE .mat).proto_stream"
-    if [[ -f $PROTO_FILE ]]; then
-      echo "ERROR: $PROTO_FILE ALREADY EXISTS"
-      exit 1
+    if [[ ! -f $PROTO_FILE ]]; then
+      echo $MAT_FILE $PROTO_FILE >> $CONVERT_DESCRIPTION
     fi
-    echo $MAT_FILE $PROTO_FILE >> $CONVERT_DESCRIPTION
   done
 done
 
@@ -47,6 +45,7 @@ else
     --sshloginfile "$PBS_NODEFILE" \
     --workdir $PROJ_DIR \
     -j $JOBS_PER_NODE \
+    --env EIGHT_CORE \
     --colsep ' ' \
     """
     IN_MAT={1}
