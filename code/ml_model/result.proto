@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+message FFT {
+  optional float band_pass_start = 1 [default=4];
+  optional float band_pass_end = 2 [default=9];
+  repeated float upper_amp = 3;
+  repeated float lower_amp = 4;
+}
+
+message Vehicle {
+  optional float mass = 1;
+  optional float speed = 2;
+}
+
+message Trial {
+  optional int32 day = 1;
+  optional float time_of_day = 2;
+  optional float temperature = 3;
+  optional Vehicle vehicle = 4;
+  optional FFT fft = 5;
+  optional bool is_monitor = 6;
+  optional int32 damage_class = 7;
+  optional float damage_amount = 8;
+}
+

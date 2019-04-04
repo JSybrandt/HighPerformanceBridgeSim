@@ -1,0 +1,74 @@
+#!/bin/bash
+
+TARGET_DIR=$1
+FLAG=$2
+
+if [[ ! -d $TARGET_DIR ]]; then
+  echo "Must supply directory containing sims"
+  echo "Usage: ./batch_compile_proto_stream path [--dry-run]"
+  exit 1
+fi
+
+MODULE_REF_FILE="/home/jsybran/module_groups/bridge_proj"
+CONDA_PREP_FILE=~/anaconda3/etc/profile.d/conda.sh
+source $CONDA_PREP_FILE
+source $MODULE_REF_FILE
+
+PROJ_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+COMP_BIN=$PROJ_DIR/code/ml_model/compile_proto_streams
+
+AMP_TYPES=(
+  "upper"
+  "lower"
+  "both"
+)
+
+FFT_TYPES=(
+  "original"
+  "filtered"
+)
+
+WORK_TO_DO=$(mktemp)
+for SIM_DIR in $(ls -d $TARGET_DIR/* ); do
+  PROTO_DIR=$SIM_DIR/daily_proto
+  if [[ -d $PROTO_DIR ]]; then
+    PICKLE_DIR=$SIM_DIR/pickles
+    mkdir -p $PICKLE_DIR
+    for AMP in "${AMP_TYPES[@]}"; do
+    for FFT in "${FFT_TYPES[@]}"; do
+      echo $PROTO_DIR $PICKLE_DIR/$AMP.$FFT.pkl $AMP $FFT >> $WORK_TO_DO
+    done done
+  fi
+done
+
+if [[ ! -z "$GO_BACKWARDS" ]]; then
+  tac $WORK_TO_DO > tmp
+  mv tmp $WORK_TO_DO
+fi
+
+if [[ $FLAG = '--dry-run' ]]; then
+  echo "DRY RUN"
+  cat $WORK_TO_DO
+else
+  parallel \
+    --sshloginfile "$PBS_NODEFILE" \
+    --workdir $PROJ_DIR \
+    -j 1 \
+    --env EIGHT_CORE \
+    --colsep ' ' \
+    """
+    PROTO_DIR={1}
+    PICKLE={2}
+    AMP={3}
+    FFT={4}
+    source $CONDA_PREP_FILE
+    source $MODULE_REF_FILE
+    $COMP_BIN                                                                  \
+      \$PROTO_DIR                                                              \
+      \$PICKLE                                                                 \
+      --top_k 10                                                               \
+      --fft_type \$FFT                                                         \
+      --amp_type \$AMP
+    """ < $WORK_TO_DO
+fi
+rm $WORK_TO_DO

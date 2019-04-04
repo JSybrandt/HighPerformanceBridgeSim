@@ -7,7 +7,6 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -19,99 +18,100 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='result.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\x0cresult.proto\"C\n\x08\x46\x66tPoint\x12\x11\n\tfrequency\x18\x01 \x01(\x02\x12\x11\n\tupper_amp\x18\x02 \x01(\x02\x12\x11\n\tlower_amp\x18\x03 \x01(\x02\"A\n\x0bMeasurement\x12\x0c\n\x04time\x18\x01 \x01(\x02\x12\x11\n\tupper_acc\x18\x02 \x01(\x02\x12\x11\n\tlower_acc\x18\x03 \x01(\x02\"\xb8\x01\n\x05Trial\x12\x0b\n\x03\x64\x61y\x18\x01 \x01(\x05\x12\x12\n\nstart_time\x18\x02 \x01(\x02\x12\"\n\x0cmeasurements\x18\x03 \x03(\x0b\x32\x0c.Measurement\x12\x1f\n\x0c\x66\x66t_original\x18\x04 \x03(\x0b\x32\t.FftPoint\x12\x1f\n\x0c\x66\x66t_filtered\x18\x05 \x03(\x0b\x32\t.FftPoint\x12\x12\n\nis_monitor\x18\x06 \x01(\x08\x12\x14\n\x0c\x64\x61mage_class\x18\x07 \x01(\x05')
+  serialized_options=None,
+  serialized_pb=_b('\n\x0cresult.proto\"a\n\x03\x46\x46T\x12\x1a\n\x0f\x62\x61nd_pass_start\x18\x01 \x01(\x02:\x01\x34\x12\x18\n\rband_pass_end\x18\x02 \x01(\x02:\x01\x39\x12\x11\n\tupper_amp\x18\x03 \x03(\x02\x12\x11\n\tlower_amp\x18\x04 \x03(\x02\"&\n\x07Vehicle\x12\x0c\n\x04mass\x18\x01 \x01(\x02\x12\r\n\x05speed\x18\x02 \x01(\x02\"\xad\x01\n\x05Trial\x12\x0b\n\x03\x64\x61y\x18\x01 \x01(\x05\x12\x13\n\x0btime_of_day\x18\x02 \x01(\x02\x12\x13\n\x0btemperature\x18\x03 \x01(\x02\x12\x19\n\x07vehicle\x18\x04 \x01(\x0b\x32\x08.Vehicle\x12\x11\n\x03\x66\x66t\x18\x05 \x01(\x0b\x32\x04.FFT\x12\x12\n\nis_monitor\x18\x06 \x01(\x08\x12\x14\n\x0c\x64\x61mage_class\x18\x07 \x01(\x05\x12\x15\n\rdamage_amount\x18\x08 \x01(\x02')
 )
 
 
 
 
-_FFTPOINT = _descriptor.Descriptor(
-  name='FftPoint',
-  full_name='FftPoint',
+_FFT = _descriptor.Descriptor(
+  name='FFT',
+  full_name='FFT',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='frequency', full_name='FftPoint.frequency', index=0,
+      name='band_pass_start', full_name='FFT.band_pass_start', index=0,
       number=1, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
+      has_default_value=True, default_value=float(4),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='upper_amp', full_name='FftPoint.upper_amp', index=1,
+      name='band_pass_end', full_name='FFT.band_pass_end', index=1,
       number=2, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
+      has_default_value=True, default_value=float(9),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='lower_amp', full_name='FftPoint.lower_amp', index=2,
-      number=3, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
+      name='upper_amp', full_name='FFT.upper_amp', index=2,
+      number=3, type=2, cpp_type=6, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='lower_amp', full_name='FFT.lower_amp', index=3,
+      number=4, type=2, cpp_type=6, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
   serialized_start=16,
-  serialized_end=83,
+  serialized_end=113,
 )
 
 
-_MEASUREMENT = _descriptor.Descriptor(
-  name='Measurement',
-  full_name='Measurement',
+_VEHICLE = _descriptor.Descriptor(
+  name='Vehicle',
+  full_name='Vehicle',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='time', full_name='Measurement.time', index=0,
+      name='mass', full_name='Vehicle.mass', index=0,
       number=1, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='upper_acc', full_name='Measurement.upper_acc', index=1,
+      name='speed', full_name='Vehicle.speed', index=1,
       number=2, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='lower_acc', full_name='Measurement.lower_acc', index=2,
-      number=3, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=85,
-  serialized_end=150,
+  serialized_start=115,
+  serialized_end=153,
 )
 
 
@@ -128,86 +128,92 @@ _TRIAL = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='start_time', full_name='Trial.start_time', index=1,
+      name='time_of_day', full_name='Trial.time_of_day', index=1,
       number=2, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='measurements', full_name='Trial.measurements', index=2,
-      number=3, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
+      name='temperature', full_name='Trial.temperature', index=2,
+      number=3, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='fft_original', full_name='Trial.fft_original', index=3,
-      number=4, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
+      name='vehicle', full_name='Trial.vehicle', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='fft_filtered', full_name='Trial.fft_filtered', index=4,
-      number=5, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
+      name='fft', full_name='Trial.fft', index=4,
+      number=5, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='is_monitor', full_name='Trial.is_monitor', index=5,
       number=6, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='damage_class', full_name='Trial.damage_class', index=6,
       number=7, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='damage_amount', full_name='Trial.damage_amount', index=7,
+      number=8, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto2',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=153,
-  serialized_end=337,
+  serialized_start=156,
+  serialized_end=329,
 )
 
-_TRIAL.fields_by_name['measurements'].message_type = _MEASUREMENT
-_TRIAL.fields_by_name['fft_original'].message_type = _FFTPOINT
-_TRIAL.fields_by_name['fft_filtered'].message_type = _FFTPOINT
-DESCRIPTOR.message_types_by_name['FftPoint'] = _FFTPOINT
-DESCRIPTOR.message_types_by_name['Measurement'] = _MEASUREMENT
+_TRIAL.fields_by_name['vehicle'].message_type = _VEHICLE
+_TRIAL.fields_by_name['fft'].message_type = _FFT
+DESCRIPTOR.message_types_by_name['FFT'] = _FFT
+DESCRIPTOR.message_types_by_name['Vehicle'] = _VEHICLE
 DESCRIPTOR.message_types_by_name['Trial'] = _TRIAL
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-FftPoint = _reflection.GeneratedProtocolMessageType('FftPoint', (_message.Message,), dict(
-  DESCRIPTOR = _FFTPOINT,
+FFT = _reflection.GeneratedProtocolMessageType('FFT', (_message.Message,), dict(
+  DESCRIPTOR = _FFT,
   __module__ = 'result_pb2'
-  # @@protoc_insertion_point(class_scope:FftPoint)
+  # @@protoc_insertion_point(class_scope:FFT)
   ))
-_sym_db.RegisterMessage(FftPoint)
+_sym_db.RegisterMessage(FFT)
 
-Measurement = _reflection.GeneratedProtocolMessageType('Measurement', (_message.Message,), dict(
-  DESCRIPTOR = _MEASUREMENT,
+Vehicle = _reflection.GeneratedProtocolMessageType('Vehicle', (_message.Message,), dict(
+  DESCRIPTOR = _VEHICLE,
   __module__ = 'result_pb2'
-  # @@protoc_insertion_point(class_scope:Measurement)
+  # @@protoc_insertion_point(class_scope:Vehicle)
   ))
-_sym_db.RegisterMessage(Measurement)
+_sym_db.RegisterMessage(Vehicle)
 
 Trial = _reflection.GeneratedProtocolMessageType('Trial', (_message.Message,), dict(
   DESCRIPTOR = _TRIAL,

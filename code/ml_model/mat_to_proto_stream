@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+from result_pb2 import Trial
+import stream  # proto stream
+from argparse import ArgumentParser
+from scipy.io import loadmat
+import numpy as np
+
+def parse_args():
+  parser = ArgumentParser()
+  parser.add_argument("in_path", type=Path)
+  parser.add_argument("out_path", type=Path)
+  return parser.parse_args()
+
+def day_from_path(day_path):
+  return int(day_path.name.split(".")[0])
+
+def damage_from_day_data(day_data):
+  assert day_data["Damage"] == 1
+  day = day_data["Day"]
+  if "E_damaged1" in day_data:
+    current_damage = 1 - (day_data["E_damaged1"] / day_data["E"])
+  else:
+    current_damage = 0
+  # Continuous
+  if day_data["Damage_Case"] == 1:
+    if day < day_data["DayDamage1"]:
+      return 0  # healthy
+    else:
+      #Warning, E_damaged1 only exists in this case
+      max_damage = 0.2
+      damage_per_class = max_damage / 5.0  # divide by # classes
+      damage_class = int(max(np.ceil(current_damage / damage_per_class), 1))
+  # Discrete
+  elif day_data["Damage_Case"] == 2:
+
+    if day < day_data["DayDamage1"]:
+      damage_class = 0
+    elif day < day_data["DayDamage2"]:
+      damage_class = 1
+    elif day < day_data["DayDamage3"]:
+      damage_class = 2
+    elif day < day_data["DayDamage4"]:
+      damage_class = 3
+    elif day < day_data["DayDamage5"]:
+      damage_class = 4
+    else:
+      damage_class = 5
+  else:
+    raise ValueError("Invalid Damage_Case")
+  return damage_class, current_damage
+
+def write_protos_from_mat(ostream,
+                          day_data,
+                          day_idx,
+                          trial_time_key,
+                          acc_key,
+                          fft_key,
+                          freq_key,
+                          mass_key):
+
+  BAND_PASS_START=4
+  BAND_PASS_END=9
+  is_monitor = acc_key.startswith("Monitor")
+  time_of_day_per_trial = day_data['Td'].tolist()
+  # row per trial, variable columns per trial
+  times_per_trial = day_data[trial_time_key][day_idx, :].tolist()
+  acc_per_trial = day_data[acc_key][day_idx, :].tolist()
+  # row per trial, fixed columns across trials
+  amps_per_trial = day_data[fft_key]["Original"].tolist()[day_idx].tolist()
+  freq_per_trial = day_data[freq_key][day_idx, :].tolist()
+  mass_per_trial = day_data[mass_key][day_idx, :].tolist()
+
+  temp_per_trial = day_data["Tact"][day_idx, :].tolist() \
+                   if "Tact" in day_data else None
+
+  if len(day_data["V"].shape) == 2:
+    speed_per_trial = day_data["V"][day_idx, :].tolist()
+  else:
+    if is_monitor:
+      speed_per_trial = day_data["V"][day_idx, :, 0].tolist()
+    else:
+      speed_per_trial = day_data["V"][day_idx, :, 1].tolist()
+
+  # assert all agree on # trials
+  total_trials = len(time_of_day_per_trial)
+  assert len(times_per_trial)        == total_trials
+  assert len(acc_per_trial)          == total_trials
+  assert len(amps_per_trial)         == total_trials
+  assert len(freq_per_trial)         == total_trials
+  assert len(mass_per_trial)         == total_trials
+  assert len(speed_per_trial)        == total_trials
+  if temp_per_trial is not None:
+    assert len(temp_per_trial)       == total_trials
+
+  damage_class, dam_amt = damage_from_day_data(day_data)
+
+  for trial_idx in range(total_trials):
+    if freq_per_trial[trial_idx].shape[0] > 0:
+      trial = Trial()
+      trial.damage_class = damage_class
+      trial.damage_amount = dam_amt
+      trial.day = day_idx + 1
+      trial.is_monitor = is_monitor
+      trial.time_of_day = time_of_day_per_trial[trial_idx]
+      if temp_per_trial is not None:
+        trial.temperature = temp_per_trial[trial_idx]
+      trial.vehicle.mass = mass_per_trial[trial_idx]
+      trial.vehicle.speed = speed_per_trial[trial_idx]
+      trial.fft.band_pass_start = BAND_PASS_START
+      trial.fft.band_pass_end = BAND_PASS_END
+      for fft_idx in range(freq_per_trial[trial_idx].shape[0]):
+        freq = freq_per_trial[trial_idx][fft_idx]
+        if freq >= BAND_PASS_START and freq < BAND_PASS_END:
+          upper_amp, lower_amp = amps_per_trial[trial_idx][:, fft_idx]
+          trial.fft.upper_amp.append(upper_amp)
+          trial.fft.lower_amp.append(lower_amp)
+      ostream.write(trial)
+
+def write_day(day_path, proto_path):
+  # remember, matlab index's from 1
+  day_idx = day_from_path(day_path) - 1
+  day_data = loadmat(str(day_path), squeeze_me=True, struct_as_record=True,
+                     variable_names=[
+                       "Monitor_Vehicle_Time",
+                       "Monitor_Vehicle_Acceleration",
+                       "Monitor_Vehicle_Frequency_Amp_Data",
+                       "Monitor_Vehicle_Frequency_Data",
+                       "MonitorVehicleMass",
+                       "Other_Vehicle_Time",
+                       "Other_Vehicle_Acceleration",
+                       "Other_Vehicle_Frequency_Amp_Data",
+                       "Other_Vehicle_Frequency_Data",
+                       "SecondVehicleMass",
+                       "Td", "V", "Tact", "Damage", "Day",
+                       "DayDamage1",
+                       "DayDamage2",
+                       "DayDamage3",
+                       "DayDamage4",
+                       "DayDamage5",
+                       "Damage_Case",
+                       "E_damaged1", "E"
+                     ])
+
+  with stream.open(str(proto_path), 'wb') as ostream:
+    write_protos_from_mat(
+      ostream,
+      day_data,
+      day_idx,
+      "Monitor_Vehicle_Time",
+      "Monitor_Vehicle_Acceleration",
+      "Monitor_Vehicle_Frequency_Amp_Data",
+      "Monitor_Vehicle_Frequency_Data",
+      "MonitorVehicleMass")
+    # oh i think it always is...
+    if "Other_Vehicle_Time" in day_data:
+      write_protos_from_mat(
+        ostream,
+        day_data,
+        day_idx,
+        "Other_Vehicle_Time",
+        "Other_Vehicle_Acceleration",
+        "Other_Vehicle_Frequency_Amp_Data",
+        "Other_Vehicle_Frequency_Data",
+        "SecondVehicleMass")
+
+if __name__=="__main__":
+  args = parse_args()
+  assert(args.in_path.is_file())
+  assert(not args.out_path.exists())
+  try:
+    write_day(args.in_path, args.out_path)
+  except Exception as e:
+    print("HORRIBLE ERROR!")
+    print(e.message())
+    args.out_path.unlink()
+  print("Done", args.in_path, args.out_path)

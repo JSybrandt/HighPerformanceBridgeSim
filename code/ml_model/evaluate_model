@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+import pickle
+import tensorflow as tf
+import numpy as np
+from argparse import ArgumentParser
+from pathlib import Path
+from sklearn.metrics import classification_report
+
+def parse_args():
+  parser = ArgumentParser()
+  parser.add_argument("input_pickle", type=Path)
+  parser.add_argument("input_model", type=Path)
+  return parser.parse_args()
+
+if __name__=="__main__":
+  args = parse_args()
+  print("Testing paths")
+  assert args.input_pickle.is_file()
+  assert args.input_pickle.suffix == ".pkl"
+  assert args.input_model.is_file()
+  assert args.input_model.suffix == ".h5"
+
+  print("Loading model")
+  model = tf.keras.models.load_model(str(args.input_model))
+
+  print("Loading data")
+  data = {split: {"x": [], "y":[]}
+          for split in ["train", "validation", "test"]}
+
+  # LOAD PICKLE
+  with open(args.input_pickle, 'rb') as pfile:
+    raw_data = pickle.loads(pfile.read())
+
+  if "description" in raw_data:
+    print("Evaluating data:", raw_data["description"])
+
+  input_size = None
+  for split in data:
+    assert split in raw_data
+    for pt in raw_data[split]:
+      if input_size is None:
+        input_size = len(pt["x"])
+      else:
+        assert len(pt["x"]) == input_size
+
+      data[split]["x"].append(pt["x"])
+      data[split]["y"].append(pt["y"])
+
+  del raw_data
+
+  for split in data:
+    data[split]["x"] = np.vstack(data[split]["x"])
+    predictions = model.predict(x=data[split]["x"], batch_size=128)
+    predictions = np.argmax(predictions, axis=1)
+
+    accuracy = np.sum(predictions == data[split]["y"]) / len(data[split]["y"])
+
+
+    report = classification_report(data[split]["y"], predictions)
+
+    print(split.upper())
+    print("Accuracy:", accuracy)
+    print(report)
