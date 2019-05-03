@@ -57,6 +57,12 @@ def load_stream(stream_path, target_type, data_per_day):
       trial.ParseFromString(data)
       assert trial.HasField("damage_class")
       assert trial.HasField("damage_amount")
+      # COMPRESS DAMAGE CLASSES
+      if trial.damage_class > 0:
+        if trial.damage_class <= 3:
+          trial.damage_class = 1
+        else:
+          trial.damage_class = 2
       res.append({'x': to_sequence(trial),
                   'y': trial.damage_class,
                   'damage_class': trial.damage_class,

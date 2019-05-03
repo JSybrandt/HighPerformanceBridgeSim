@@ -33,7 +33,7 @@ lim=num_days;
 Surface=1; % 1 if surface is considered, 0 otherwise
 Damage=1; % 1 if damage effects are considered, 0 otherwise
 Bridge=1; % Indicates which bridge is being tested
-NumberElements=10; % Number of elements bridge is divided into
+NumberElements=11; % Number of elements bridge is divided into
 
 % Load variable arrays
 BridgeVariables=load(bridge_data_path);
@@ -63,21 +63,40 @@ end
 
 % Damage Variables
 if Damage==1 && Damage_Case==1
-DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
-DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
-ED1=[((.01+rand(1)*(.02-.01))*E),.001*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
+% Continuous
+DamageLocation = 5;
+%DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
+%DayDamage1=round(lim*.25)+round(rand(1)*(lim*.33-lim*.25)); % The day damage is iniciated on bridge
+DayDamage1=120;
+damaged_days = lim - DayDamage1;
+init_damage=0.5;
+total_damage=0.25;
+damage_per_day = (total_damage-init_damage)/damaged_days;
+ED1=[init_damage*E, ones(1, damaged_days)*damage_per_day*E];
+%ED1=[((.02+rand(1)*(.02-.01))*E), .001*rand(1,(lim-DayDamage1+1))*E]; % Damaged Modulus 1
 elseif Damage==1 && Damage_Case==2
-DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
-DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge
-DayDamage2=round(lim*.35)+round(rand(1)*(lim*.45-lim*.35)); % The day second damage is iniciated on bridge
-DayDamage3=round(lim*.55)+round(rand(1)*(lim*.65-lim*.55)); % The day damage is iniciated on bridge
-DayDamage4=round(lim*.7)+round(rand(1)*(lim*.75-lim*.7)); % The day damage is iniciated on bridge
-DayDamage5=round(lim*.8)+round(rand(1)*(lim*.9-lim*.8)); % The day damage is iniciated on bridge
-ED1=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 1
-ED2=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 2
-ED3=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 3
-ED4=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 4
-ED5=((.01+rand(1)*(.02-.01))*E); % Damaged Modulus 5
+DamageLocation=5;
+%DamageLocation=randsample(ele(:,1),1); % Where damage locations begin
+DayDamage1=120;
+%DayDamage1=round(lim*.25)+round(rand(1)*(lim*.3-lim*.25)); % The day damage is iniciated on bridge
+DayDamage2=240;
+%DayDamage2=round(lim*.35)+round(rand(1)*(lim*.45-lim*.35)); % The day second damage is iniciated on bridge
+DayDamage3=360;
+%DayDamage3=round(lim*.55)+round(rand(1)*(lim*.65-lim*.55)); % The day damage is iniciated on bridge
+DayDamage4=480;
+%DayDamage4=round(lim*.7)+round(rand(1)*(lim*.75-lim*.7)); % The day damage is iniciated on bridge
+DayDamage5=600;
+%DayDamage5=round(lim*.8)+round(rand(1)*(lim*.9-lim*.8)); % The day damage is iniciated on bridge
+ED1=0.5;
+ED2=0.5;
+ED3=0.5;
+ED4=0.5;
+ED5=0.5;
+%ED1=((.03+rand(1)*(.05-.03))*E); % Damaged Modulus 1
+%ED2=((.03+rand(1)*(.05-.03))*E); % Damaged Modulus 2
+%ED3=((.03+rand(1)*(.05-.03))*E); % Damaged Modulus 3
+%ED4=((.03+rand(1)*(.05-.03))*E); % Damaged Modulus 4
+%ED5=((.03+rand(1)*(.05-.03))*E); % Damaged Modulus 5
 end
 
 
@@ -131,14 +150,14 @@ if number_vehicles(gg,hh)==1
     row(gg,hh,1)=randi([1 8]);
     row(gg,hh,2)=0;
 
-    V(gg,hh,1)=randi([10 25]);
+    V(gg,hh,1)=randi([2 25]);
     V(gg,hh,2)=0;
 elseif number_vehicles(gg,hh)==2
     row(gg,hh,1)=randi([1 8]);
     row(gg,hh,2)=randi([1 8]);
 
-    V(gg,hh,1)=randi([10 25]);
-    V(gg,hh,2)=randi([10 25]);
+    V(gg,hh,1)=randi([2 25]);
+    V(gg,hh,2)=randi([2 25]);
 end
     end
 end
@@ -153,7 +172,7 @@ MonitorWheelDamping=zeros(lim,n);
 Monitorfv=cell(lim,n);
 
 row=randi([1 8],lim,n); % Randomly selects which vehicle is crossing bridge
-V=randi([10 25],lim,n); % Speed of vehicle m/s
+V=randi([2 25],lim,n); % Speed of vehicle m/s
 
 % Storage matrices and cell arrays (used to store information for machine
 % learning)

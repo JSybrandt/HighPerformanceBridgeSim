@@ -31,7 +31,7 @@ def damage_from_day_data(day_data):
       damage_class = 0  # healthy
     else: 
       #Warning, E_damaged1 only exists in this case
-      max_damage = 0.2
+      max_damage = 0.25
       damage_per_class = max_damage / 5.0  # divide by # classes
       damage_class = int(max(np.ceil(current_damage / damage_per_class), 1))
   # Discrete
@@ -61,8 +61,8 @@ def write_protos_from_mat(ostream,
                           freq_key,
                           mass_key):
 
-  BAND_PASS_START=4
-  BAND_PASS_END=9
+  BAND_PASS_START=3
+  BAND_PASS_END=10
   is_monitor = acc_key.startswith("Monitor")
   time_of_day_per_trial = day_data['Td'].tolist()
   # row per trial, variable columns per trial

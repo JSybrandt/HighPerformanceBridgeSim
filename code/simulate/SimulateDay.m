@@ -4,8 +4,8 @@ load(inPath);
 
 % Record 4 - 9
 FFT_STEP = 0.05
-FFT_SELECT_START=floor(4/FFT_STEP)+1
-FFT_SELECT_END=floor(9/FFT_STEP)+1
+FFT_SELECT_START=floor(3/FFT_STEP)+1
+FFT_SELECT_END=floor(10/FFT_STEP)+1
 
 hour = 0;
 for ii=1:n
@@ -44,15 +44,14 @@ end
 
 % Applying damaged modulus to elemental matrix
 if Damage==1 && Damage_Case==1
-       if Day>=DayDamage1
-           if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .2
-               E_damaged1=E*.8;
-           else
-E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
-           end
-           kb_damaged1=KBeam(E_damaged1*u0,I,l);
-       end
-
+  if Day>=DayDamage1
+    if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .25
+      E_damaged1=E*.75;
+    else
+      E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
+    end
+    kb_damaged1=KBeam(E_damaged1*u0,I,l);
+  end
 elseif Damage==1 && Damage_Case==2
 
     if Day>=DayDamage5

@@ -18,7 +18,7 @@ def parse_args():
   parser.add_argument("--output_file", type=Path)
   parser.add_argument("--splits", nargs="+", choices=["train", "validation", "test"], default=["train", "validation", "test"])
   parser.add_argument("--subset", action="store_true")
-  parser.add_argument("--sequence_limit", type=int, default=100)
+  parser.add_argument("--sequence_limit", type=int, default=140)
   return parser.parse_args()
 
 if __name__=="__main__":
@@ -86,7 +86,7 @@ if __name__=="__main__":
   with open(args.output_file, 'w') as o_file:
     for split in data:
       print(f"Evaluating {split}")
-      pred_damage_class, _ = model.predict(data[split]["x"],batch_size=128)
+      pred_damage_class = model.predict(data[split]["x"],batch_size=128)
       predicted_nums = np.argmax(pred_damage_class, axis=1)
       target_nums = np.argmax(data[split]["damage_class"], axis=1)
       accuracy = np.mean(predicted_nums == target_nums)
