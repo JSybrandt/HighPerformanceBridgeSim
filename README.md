@@ -7,9 +7,9 @@ running the following commands:
 # Remove other modules that may conflict
 module purge
 # Add matlab for simulation
-module load matlab
+module load matlab/2018b
 # add the most up-to-date version of python
-module load anaconda3/5.01
+module load anaconda3/5.0.1
 # add nvidia modules for GPU acceleration of the ML model
 module load cuda-toolkit/9.0.176
 module load cuDNN/9.0v7
