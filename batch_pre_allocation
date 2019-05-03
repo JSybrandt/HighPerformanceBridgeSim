@@ -1,10 +1,10 @@
 #!/bin/bash
 
-FLAG=$1
+OUT_DIR=${1:-"/scratch4/$USER/bridge_sim"}
+FLAG=$2
 DAYS_TO_SIM=${DAYS_TO_SIM:-730}
 JOBS_PER_NODE=${JOBS_PER_NODE:-12}
-SCRATCH_DIR="/scratch4/$USER/bridge_sim"
-mkdir -p $SCRATCH_DIR
+mkdir -p $OUT_DIR
 
 # Support conda deactivate
 MODULE_REF_FILE="/home/jsybran/module_groups/bridge_proj"
@@ -25,20 +25,17 @@ WEATHER_FILES=(\
 
 WEATHER_SETTINGS=( 0 1 )
 VEHICLE_SETTINGS=( 0 1 )
-DAMAGE_SETTINGS=( 1
-                 #2
-                )
+DAMAGE_SETTINGS=( 1 2 )
 BRIDGE_DATA=$PROJ_DIR/data/BridgeVariables.dat
 VEHICLE_DATA=$PROJ_DIR/data/VehicleData.dat
 
 # these files describe each parallel task
 SCENARIO_DESCRIPTIONS=$(mktemp)
-DAILY_SIM_DESCRIPTIONS=$(mktemp)
 for VEHICLE_SETTING in ${VEHICLE_SETTINGS[@]}; do
 for DAMAGE_SETTING in ${DAMAGE_SETTINGS[@]}; do
 for WEATHER_SETTING in ${WEATHER_SETTINGS[@]}; do
 for WEATHER_DATA in ${WEATHER_FILES[@]}; do
-  WORK_DIR=$(mktemp -dp $SCRATCH_DIR)
+  WORK_DIR=$(mktemp -dp $OUT_DIR)
   DAY_DIR=$WORK_DIR/daily_sim
   mkdir -p $DAY_DIR
   OUT_REF_FILE=$WORK_DIR/reference_data
@@ -63,26 +60,23 @@ for WEATHER_DATA in ${WEATHER_FILES[@]}; do
   The results of each daily trial are stored in $DAY_DIR
   """ > $WORK_DIR/description.txt
 
-  for DAY in $(seq $DAYS_TO_SIM); do
-    echo $OUT_REF_FILE $DAY $DAY_DIR/$DAY >> $DAILY_SIM_DESCRIPTIONS
-  done
-
 done done done done
 
 if [[ $FLAG == '--dry-run' ]]; then
   cat $SCENARIO_DESCRIPTIONS
-  cat $DAILY_SIM_DESCRIPTIONS
 elif [[ $FLAG == '--clean' ]]; then
-  rm -rf $SCRATCH_DIR
+  rm -rf $OUT_DIR
 elif [[ -z $FLAG ]]; then
   echo "Running $PREP_BIN on each scenario"
   # Run prep
   parallel \
+    --linebuffer \
     --sshloginfile "$PBS_NODEFILE" \
     --workdir $PROJ_DIR \
     -j $JOBS_PER_NODE \
     --colsep ' ' \
     """
+    export MCR_CACHE_ROOT=\$(mktemp -d)
     OUT_REF_FILE={1}
     VEHICLE_SETTING={2}
     DAMAGE_SETTING={3}
@@ -100,34 +94,11 @@ elif [[ -z $FLAG ]]; then
       $BRIDGE_DATA \
       $VEHICLE_DATA
     echo Created \$OUT_REF_FILE
+    rm -rf \$MCR_CACHE_ROOT
     """ < $SCENARIO_DESCRIPTIONS
-
-  echo "Simulating each day"
-  parallel \
-    --sshloginfile "$PBS_NODEFILE" \
-    --workdir $PROJ_DIR \
-    -j $JOBS_PER_NODE \
-    --colsep ' ' \
-    """
-    REFERENCE_DATA={1}
-    DAY={2}
-    OUTPUT={3}
-    source $CONDA_PREP_FILE
-    source $MODULE_REF_FILE
-    echo Running $SIM_BIN \
-                \$REFERENCE_DATA \
-                \$DAY \
-                \$OUTPUT
-    $SIM_BIN \
-      \$REFERENCE_DATA \
-      \$DAY \
-      \$OUTPUT
-    echo Simulated \$OUTPUT
-    """ < $DAILY_SIM_DESCRIPTIONS
 else
   echo "Did not understand $FLAG"
   echo "Usage: ./run_sims.sh [--dry-run|--clean]"
   exit 1
 fi
 rm $SCENARIO_DESCRIPTIONS
-rm $DAILY_SIM_DESCRIPTIONS

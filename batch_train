@@ -1,7 +1,8 @@
 #!/bin/bash
 
-TARGET_DIR=${1:-"/scratch4/$USER/bridge_sim"}
-FLAG=$2
+MODEL_NAME=${1:-"lstm"}
+TARGET_DIR=${2:-"/scratch4/$USER/bridge_sim"}
+
 
 if [[ ! -d $TARGET_DIR ]]; then
   echo "Must supply directory containing sims"
@@ -9,15 +10,13 @@ if [[ ! -d $TARGET_DIR ]]; then
   exit 1
 fi
 
-NUM_DAYS=${NUM_DAYS:-730}
-
 MODULE_REF_FILE="/home/jsybran/module_groups/bridge_proj"
 CONDA_PREP_FILE=~/anaconda3/etc/profile.d/conda.sh
 source $CONDA_PREP_FILE
 source $MODULE_REF_FILE
 
 PROJ_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-COMP_BIN=$PROJ_DIR/code/ml_model/compile_proto_streams
+TRAIN_BIN=$PROJ_DIR/code/ml_model/train_model
 
   parallel \
     --linebuffer \
@@ -26,15 +25,18 @@ COMP_BIN=$PROJ_DIR/code/ml_model/compile_proto_streams
     -j 1 \
     --env EIGHT_CORE \
     """
-    SOURCE_DIR={}/daily_proto
-    TARGET_PKL={}/data.pkl
-    #if [[ \$(ls \$SOURCE_DIR/*.proto_stream | wc -l) -eq $NUM_DAYS ]]; then
-      if [[ ! -f \$TARGET_PKL ]]; then
+    TRAINING_DATA={}/data.pkl
+    MODEL_OUT={}/"$MODEL_NAME"_model.h5
+    NORMALIZER_OUT={}/"$MODEL_NAME"_normalizer.pkl
+    if [[ -f \$TRAINING_DATA ]]; then
         source $CONDA_PREP_FILE
         source $MODULE_REF_FILE
-        $COMP_BIN \$SOURCE_DIR \$TARGET_PKL
-      fi
-    #else
-      #echo Insufficient results in {}
-    #fi
+        $TRAIN_BIN \$TRAINING_DATA \
+          --model_out \$MODEL_OUT \
+          --normalizer_out \$NORMALIZER_OUT
+        #&>/dev/null
+        echo {} Converged!
+    else
+      echo No training data found in {}
+    fi
     """ ::: $(ls -d $TARGET_DIR/*)

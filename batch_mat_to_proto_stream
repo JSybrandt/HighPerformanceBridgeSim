@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SIM_BASE=$1
+SIM_BASE=${1:-"/scratch4/$USER/bridge_sim"}
 FLAG=$2
 
 JOBS_PER_NODE=${JOBS_PER_NODE:-20}
@@ -46,6 +46,7 @@ if [[ $FLAG = '--dry-run' ]]; then
   cat $CONVERT_DESCRIPTION
 else
   parallel \
+    --linebuffer \
     --sshloginfile "$PBS_NODEFILE" \
     --workdir $PROJ_DIR \
     -j $JOBS_PER_NODE \

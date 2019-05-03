@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+import pickle
+import tensorflow as tf
+import numpy as np
+from argparse import ArgumentParser
+from pathlib import Path
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import random
+
+# print confidence plot
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
+def parse_args():
+  parser = ArgumentParser()
+  parser.add_argument("--data", type=Path)
+  parser.add_argument("--model", type=Path)
+  parser.add_argument("--normalizer", type=Path)
+  parser.add_argument("--output_file", type=Path)
+  parser.add_argument("--split", choices=["train", "validation", "test"], default="test")
+  parser.add_argument("--sequence_limit", type=int, default=100)
+  parser.add_argument("--num_days", type=int, default=720)
+  return parser.parse_args()
+
+def get_predictions_per_class(args, model, normalizer, x):
+  original_shape = x.shape
+  num_features = x.shape[2]
+  x = normalizer.transform(x.reshape(-1, num_features)).reshape(original_shape)
+  predictions = model.predict(x, batch_size=128)[0]
+  # booleans = np.zeros_like(predictions)
+  # booleans[np.arange(len(predictions)), booleans.argmax(axis=1)] = 1
+  return np.sum(predictions, axis=0)
+
+def load_data_per_day(args):
+  with open(args.data, 'rb') as pfile:
+    raw_data = pickle.loads(pfile.read())
+
+  if "description" in raw_data:
+    print("Loading data:", raw_data["description"])
+
+  day2data = {d:{"x":[], "damage_class":None} for d in range(1,args.num_days+1)}
+  for raw_pt in raw_data[args.split]:
+    if raw_pt["day"] in day2data:
+      day2data[raw_pt["day"]]["x"].append(raw_pt["x"])
+      if day2data[raw_pt["day"]]["damage_class"] is None:
+        day2data[raw_pt["day"]]["damage_class"] = raw_pt["damage_class"]
+      else:
+        assert day2data[raw_pt["day"]]["damage_class"] == raw_pt["damage_class"]
+  for day, data in day2data.items():
+    data["x"] = tf.keras.preprocessing.sequence.pad_sequences(
+        data["x"], args.sequence_limit, dtype=float)
+    #print(day, data["x"].shape, data["damage_class"])
+  return day2data
+
+def write_confidence_plot(day2correct, day2classcounts, out_path):
+  days = set(day2correct.keys()).intersection(set(day2classcounts.keys()))
+  days = list(days)
+  days.sort()
+
+  damage_classes = list(set(day2correct.values())-{None})
+  damage_classes.sort()
+
+  fig, (ax2, ax1) = plt.subplots(
+      2, sharex=True, figsize=(8, 2.5), gridspec_kw={'height_ratios': [1, 4]})
+
+  damage2color = {
+      0: "darkgreen",
+      1: "gold",
+      2: "darkorange",
+      3: "sienna",
+      4: "coral",
+      5: "firebrick"
+  }
+
+  largest_incorrect_each_day = [
+      max([
+          x for i, x in enumerate(day2classcounts[day]) if i != day2correct[day]
+      ]) / sum(day2classcounts[day]) for day in days
+  ]
+  correct_amt_each_day = [
+      day2classcounts[day][day2correct[day]] / sum(day2classcounts[day])
+      for day in days
+  ]
+
+  confidence_data = [
+      i - j for i, j in zip(correct_amt_each_day, largest_incorrect_each_day)
+  ]
+
+
+  # reversed to improve coloring
+  for damage_class in reversed(damage_classes):
+    days_when_largest = [
+        day2classcounts[day][damage_class] == max(day2classcounts[day])
+        for day in days
+    ]
+
+    ax1.fill_between(
+        days,
+        0,
+        confidence_data,
+        where=days_when_largest,
+        facecolor=damage2color[damage_class],
+        edgecolor=damage2color[damage_class])
+
+  last_dc = 0
+  last_day = 0
+  for day in days:
+    damage_class = day2correct[day]
+    if damage_class != last_dc:
+      ax2.fill_between([last_day, day],
+                       0,
+                       1,
+                       facecolor=damage2color[last_dc],
+                       edgecolor=damage2color[last_dc])
+      ax2.text(
+          (day + last_day) / 2,
+          0.5,
+          "D{}".format(last_dc),
+          horizontalalignment="center",
+          verticalalignment="center")
+      last_dc = damage_class
+      last_day = day
+      ax1.axvline(x=day, color='black')
+      ax2.axvline(x=day, color='black')
+
+  ax2.fill_between([last_day, days[-1]],
+                   0,
+                   1,
+                   facecolor=damage2color[damage_classes[-1]],
+                   edgecolor=damage2color[damage_classes[-1]])
+
+  ax2.text(
+      (days[-1] + last_day) / 2,
+      0.5,
+      "D{}".format(damage_classes[-1]),
+      horizontalalignment="center",
+      verticalalignment="center")
+
+  ax1.set_ylim(-1, 1)
+  ax1.set_xlim(0, 720)
+  ax2.set_xlim(0, 720)
+  ax2.yaxis.set_visible(False)
+
+  ax1.set_ylabel("Confidence")
+  ax1.set_xlabel("Time (Days)")
+
+  ax2.text(
+      0,
+      0.5,
+      "Truth",
+      fontsize=10,
+      horizontalalignment='right',
+      verticalalignment='center',
+      rotation="vertical",
+      transform=ax2.transAxes)
+
+  ax2.set_title("Car Predictions Per Day")
+  fig.tight_layout()
+
+  plt.savefig(out_path, format="png", bbox_inches="tight")
+  plt.close()
+
+
+
+if __name__=="__main__":
+  args = parse_args()
+  print("Testing paths")
+  assert args.data.is_file()
+  assert args.data.suffix == ".pkl"
+  assert args.model.is_file()
+  assert args.model.suffix == ".h5"
+  assert args.normalizer.is_file()
+  assert args.normalizer.suffix == ".pkl"
+  assert args.output_file.suffix == ".png"
+
+  print("Loading day to data")
+  day2data = load_data_per_day(args)
+
+  print("Loading model")
+  model = tf.keras.models.load_model(str(args.model))
+
+  print("Loading normalizer")
+  normalizer = joblib.load(str(args.normalizer))["feature_normalizer"]
+
+  day2correct = {d: v["damage_class"] for d, v in day2data.items()}
+  print("Predicting each day.")
+  day2pred_sum = {}
+  for day, data in day2data.items():
+    if len(data["x"]) > 0:
+      pred_sum = get_predictions_per_class(args, model, normalizer, data["x"])
+      day2pred_sum[day] = pred_sum
+  # day2classcounts = {d: get_predictions_per_class(args, model, normalizer, v["x"], d)
+                     # for d, v in day2data.items() if len(v["x"]) > 0}
+
+  write_confidence_plot(day2correct, day2pred_sum, args.output_file)

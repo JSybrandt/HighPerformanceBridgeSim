@@ -25,46 +25,48 @@ def parse_args():
   return parser.parse_args()
 
 def to_sequence(trial):
-  sequence = []
   seq_length = len(trial.fft.upper_amp)
   assert seq_length == len(trial.fft.lower_amp)
   assert seq_length > 0
+  num_features = 6
+  if trial.HasField("temperature"):
+    num_features += 1
+  sequence = np.empty((seq_length, num_features), dtype=np.float32)
   band_pass_step = (trial.fft.band_pass_end - trial.fft.band_pass_start) \
                  / seq_length
   for idx, freq in enumerate(np.arange(trial.fft.band_pass_start,
                                        trial.fft.band_pass_end,
                                        band_pass_step)):
-    sequence.append([trial.time_of_day,
-                     trial.vehicle.mass,
-                     trial.vehicle.speed,
-                     trial.temperature,
-                     freq,
-                     trial.fft.upper_amp[idx],
-                     trial.fft.lower_amp[idx]])
+    sequence[idx, :] = [trial.time_of_day,
+                        trial.vehicle.mass,
+                        trial.vehicle.speed,
+                        freq,
+                        trial.fft.upper_amp[idx],
+                        trial.fft.lower_amp[idx]] \
+                     + ([trial.temperature] \
+                       if trial.HasField("temperature") \
+                       else [])
   return sequence
 
 def load_stream(stream_path, target_type, data_per_day):
   res = []
-  #try:
+  # try:
   with stream.open(str(stream_path), 'rb') as proto_stream:
-    for idx, data in enumerate(tqdm(proto_stream,
-                                    position=current_process()._identity[0],
-                                    disable=DISABLE_PBAR)):
+    for idx, data in enumerate(proto_stream):
       trial = Trial()
       trial.ParseFromString(data)
-      if target_type == "classification":
-        assert trial.HasField("damage_class")
-        target = trial.damage_class
-      if target_type == "regression":
-        assert trial.HasField("damage_amount")
-        target = trial.damage_amount
+      assert trial.HasField("damage_class")
+      assert trial.HasField("damage_amount")
       res.append({'x': to_sequence(trial),
-                  'y': target,
+                  'y': trial.damage_class,
+                  'damage_class': trial.damage_class,
+                  'damage_amount': trial.damage_amount,
                   'day': trial.day})
+      del trial
       if data_per_day is not None and num_complete >= data_per_day:
         break
-  #except:
-  #  print("TOTAL FILE ERROR:", stream_path)
+  # except Exception as e:
+    # print("Error with file:", stream_path, e)
   return res
 
 def get_empty_output_dict():
@@ -81,9 +83,11 @@ def random_split(unsorted_data,validation_ratio, test_ratio):
   validation_cutoff = int(train_cutoff + len(unsorted_data)*validation_ratio)
   assert train_cutoff > 0
   assert validation_cutoff >= train_cutoff
-  output["train"] = unsorted_data[:train_cutoff]
-  output["validation"] = unsorted_data[train_cutoff:validation_cutoff]
   output["test"] = unsorted_data[validation_cutoff:]
+  del unsorted_data[validation_cutoff:]
+  output["validation"] = unsorted_data[train_cutoff:]
+  del unsorted_data[train_cutoff:]
+  output["train"] = unsorted_data
   return output
 
 if __name__=="__main__":
@@ -102,16 +106,18 @@ if __name__=="__main__":
                      validation_ratio=args.validation_ratio,
                      test_ratio=args.test_ratio)
 
-  print("Starting")
-
-  data_labels = []
+  print("Loading Each Day")
   with Pool() as pool:
-    for res in tqdm(pool.imap(load_fn, stream_paths),
-                              total=len(stream_paths),
-                              disable=DISABLE_PBAR):
-      data_labels += res
+    data_per_day = pool.map(load_fn, stream_paths)
+  print("Stacking days together")
+  data = []
+  for day_data in tqdm(data_per_day):
+    data.extend(day_data)
+    del day_data
 
-  output = split_fn(data_labels)
+  print("Shuffling")
+  output = split_fn(data)
   output["description"] = str(args)
+  print("Saving")
   with open(args.out_path, 'wb') as pfile:
     pickle.dump(output, pfile)

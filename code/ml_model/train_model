@@ -1,156 +1,187 @@
 #!/usr/bin/env python3
-import pickle
 import tensorflow as tf
+import pickle
 import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.externals import joblib
+from sklearn.utils.class_weight import compute_class_weight
+from imblearn.keras import balanced_batch_generator
+from imblearn.under_sampling import RandomUnderSampler
 
 def parse_args():
   parser = ArgumentParser()
   parser.add_argument("input_pickle", type=Path)
-  parser.add_argument("output_model_path", type=Path)
-  parser.add_argument("--model_type", choices=["top_k", "sequence"], default="sequence")
-  parser.add_argument("--batch_size", type=int, default=256)
+  parser.add_argument("--model_out", type=Path)
+  parser.add_argument("--normalizer_out", type=Path)
+  parser.add_argument("--batch_size", type=int, default=128)
   parser.add_argument("--epochs", type=int, default=10000)
+  parser.add_argument("--sequence_limit", type=int, default=100)
   return parser.parse_args()
 
-def top_k_model(input_size, num_classes):
-  model = tf.keras.Sequential()
-  #model.add(tf.keras.layers.Input(shape=(input_size,)))
-  model.add(tf.keras.layers.Dense(1024, activation="relu"))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(1024, activation="relu"))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(1024, activation="relu"))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(1024, activation="relu"))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(1024, activation="relu"))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(num_classes, activation="softmax"))
-  return model
+def seq_model(seq_length, num_features, num_classes):
+  input_layer = tf.keras.layers.Input((seq_length, num_features))
+  hl = tf.keras.layers.Conv1D(16, 5,
+                              activation="relu",
+                              padding="causal")(input_layer)
+  hl = tf.keras.layers.Conv1D(16, 5,
+                              activation="relu",
+                              padding="causal")(hl)
+  hl = tf.keras.layers.MaxPooling1D()(hl)
+  hl = tf.keras.layers.Conv1D(32, 3,
+                              activation="relu",
+                              padding="causal")(hl)
+  hl = tf.keras.layers.Conv1D(32, 3,
+                              activation="relu",
+                              padding="causal")(hl)
+  hl = tf.keras.layers.MaxPooling1D()(hl)
+  hl = tf.keras.layers.Conv1D(64, 3,
+                              activation="relu",
+                              padding="causal")(hl)
+  hl = tf.keras.layers.Conv1D(64, 3,
+                              activation="relu",
+                              padding="causal")(hl)
+  hl = tf.keras.layers.MaxPooling1D()(hl)
+  hl = tf.keras.layers.Flatten()(hl)
+  hl = tf.keras.layers.Dense(512, activation="relu")(hl)
+  hl = tf.keras.layers.Dense(512, activation="relu")(hl)
 
-def sequence_model(seq_length, num_features, num_classes):
-  print("Constructing Seq Model for ", seq_length, num_features, num_classes)
-  seq_in = tf.keras.layers.Input(shape=(seq_length, num_features))
-  lstm_1 = tf.keras.layers.Bidirectional(
-      tf.keras.layers.GRU(num_features*2, return_sequences=True))(seq_in)
-  lstm_2 = tf.keras.layers.Bidirectional(
-      tf.keras.layers.GRU(num_features*2))(lstm_1)
-  prediction = tf.keras.layers.Dense(num_classes, activation="softmax")(lstm_2)
-  model = tf.keras.models.Model(seq_in, prediction)
-  return model
+  # hl = tf.keras.layers.LSTM(256,
+                                      # #return_sequences=True,
+                                      # unroll=True,
+                                      # recurrent_dropout=0.5)(hl)
+  # hl = tf.keras.layers.Concatenate()(
+                   # tf.keras.layers.LSTM(256,
+                                        # unroll=True,
+                                        # recurrent_dropout=0.5,
+                                        # dropout=0.5,
+                                        # return_state=True)(hl))
+  class_out = tf.keras.layers.Dense(num_classes,
+                                    activation="softmax",
+                                    name="damage_class")(hl)
+  amount_out = tf.keras.layers.Dense(1,
+                                     activation="linear",
+                                     name="damage_amount")(hl)
 
-def labels_to_categories(data):
-  for split in data:
-    data[split]["y"] = tf.keras.utils.to_categorical(data[split]["y"])
+  model = tf.keras.models.Model(inputs=[input_layer],
+                                outputs=[class_out, amount_out])
+  return model
 
 if __name__=="__main__":
   args = parse_args()
   print("Testing paths")
   assert args.input_pickle.is_file()
-
   print("Testing params")
   assert args.batch_size > 0
   assert args.epochs > 0
 
   print("Loading data")
-  data = {split_name: {"x": [], "y":[]}
-          for split_name in ["train", "validation"]}
-
-  # LOAD PICKLE
   with open(args.input_pickle, 'rb') as pfile:
     raw_data = pickle.loads(pfile.read())
 
-  if "description" in raw_data:
-    print("Training on data:", raw_data["description"])
+  print("Loading data")
+  splits = ["train", "validation"]
+  data = {}
+  for split in splits:
+    assert split in raw_data
+    data[split] = {
+        "x": [],
+        "damage_class":[],
+        "damage_amount":[]
+      }
+    for pt in raw_data[split]:
+      data[split]["x"].append(pt["x"])
+      data[split]["damage_class"].append(pt["damage_class"])
+      data[split]["damage_amount"].append(pt["damage_amount"])
+    # Convert to np
+    data[split]["x"] = tf.keras.preprocessing.sequence.pad_sequences(
+        data[split]["x"], args.sequence_limit, dtype=float)
+    # To one-hot
+    data[split]["damage_class"] = tf.keras.utils.to_categorical(
+        data[split]["damage_class"])
+    # to np
+    data[split]["damage_amount"] = np.array(
+        data[split]["damage_amount"],
+        dtype=float).reshape(-1, 1)
 
-  for split_name in data:
-    assert split_name in raw_data
-    for pt in raw_data[split_name]:
-      data[split_name]["x"].append(pt["x"])
-      data[split_name]["y"].append(pt["y"])
+  print("Normalizing")
+  num_features = data["train"]["x"].shape[2]
+  feature_normalizer = MinMaxScaler(copy=False)
+  damage_amount_normalizer = MinMaxScaler(copy=False)
+  feature_normalizer.fit(data["train"]["x"].reshape(-1, num_features))
+  damage_amount_normalizer.fit(data["train"]["damage_amount"])
+  for split in splits:
+    # Normalizing features
+    original_shape = data[split]["x"].shape
+    data[split]["x"] = feature_normalizer.transform(
+        data[split]['x'].reshape(-1, num_features)
+    ).reshape(original_shape)
+    # Normalizing damage_amount
+    data[split]["damage_amount"] = damage_amount_normalizer.transform(
+        data[split]["damage_amount"])
+  print("Saving normalizers")
+  joblib.dump({"damage_amount_normalizer": damage_amount_normalizer,
+               "feature_normalizer": feature_normalizer},
+               args.normalizer_out)
 
-  del raw_data
-  # DONE LOAD
+  print("Getting class weights")
+  class_vals = data["train"]["damage_class"].argmax(axis=1)
+  classes = np.unique(class_vals)
+  print(classes)
+  weights = compute_class_weight("balanced",
+                                       classes,
+                                       class_vals)
+  print(weights)
+  class_weight = {c:w for c, w in zip(classes,weights)}
+  print(class_weight)
 
-  labels_to_categories(data)
-  num_classes = len(data["train"]["y"][0])
-  normalizer = MinMaxScaler(copy=False)
-
-  model = None
-  if args.output_model_path.is_file():
-    model = tf.keras.models.load_model(str(args.output_model_path))
-
-  if args.model_type == "top_k":
-    for split_name in data:
-      data[split_name]["x"] = np.vstack(data[split_name]["x"])
-    normalizer.fit(data["train"]["x"])
-    for split_name in data:
-      normalizer.transform(data[split_name]["x"])
-    input_size = data["train"]["x"].shape[1]
-    if model is None:
-      model = top_k_model(input_size, num_classes)
-    loss = "categorical_crossentropy"
-
-  elif args.model_type == "sequence":
-    print("Padding to np array")
-    seq_length = np.max([len(s) for s in data["train"]["x"]])
-    for split_name in data:
-      data[split_name]["x"] = tf.keras.preprocessing.sequence.pad_sequences(
-          data[split_name]["x"], seq_length, dtype=float)
-    num_features = data["train"]["x"].shape[2]
-
-    print("Normalizing")
-    normalizer.fit(data[split_name]["x"].reshape(-1, num_features))
-    for split_name in data:
-      t = data[split_name]["x"]
-      data[split_name]["x"] = normalizer.transform(
-          t.reshape(-1, num_features)).reshape(t.shape)
-    if model is None:
-      model = sequence_model(seq_length, num_features, num_classes)
-    loss = "categorical_crossentropy"
+  if args.model_out.is_file():
+    print("Loading existing model.")
+    model = tf.keras.models.load_model(str(args.model_out))
   else:
-    raise Exception("Model: " + model_type + " not impl.")
-
-  count_per_class = np.sum(data["train"]["y"], axis=0)
-  num_samples = len(data["train"]["y"])
-  num_healthy = count_per_class[0]
-  num_damaged = np.sum(count_per_class[1:])
-  # add in all the damaged weights
-  class_weights = {
-    class_idx: num_samples / (count_per_class[class_idx] * len(count_per_class)-1)
-    for class_idx in range(0, len(count_per_class))
-  }
-  #class_weights[0] = sum([class_weights[i] for i in range(1, len(count_per_class))])/3
-
-  print(class_weights)
-
-  healthy_to_non_ratio = count_per_class[0] / np.sum(count_per_class[1:])
+    print("Creating model.")
+    model = seq_model(args.sequence_limit, num_features, len(classes))
+    model.summary()
 
   model = tf.keras.utils.multi_gpu_model(model, 2)
+  model.compile(
+      optimizer=tf.keras.optimizers.Adam(),
+      loss={"damage_class": "categorical_crossentropy",
+            "damage_amount":"mse"},
+      metrics={"damage_class": "accuracy",
+               "damage_amount": "mse"},
+    )
 
-  model.compile(optimizer=tf.keras.optimizers.SGD(0.01),
-                loss=loss,
-                metrics=["accuracy"])
 
-  model.summary()
-
-  model.fit(x=data["train"]["x"],
-            y=data["train"]["y"],
-            batch_size=args.batch_size,
-            epochs=args.epochs,
-            #class_weight=class_weights,
-            validation_data=(data["validation"]["x"], data["validation"]["y"]),
-            shuffle=True,
-            callbacks=[
-              tf.keras.callbacks.EarlyStopping(monitor="val_loss",
-                                               patience=10),
-              tf.keras.callbacks.TerminateOnNaN(),
-              tf.keras.callbacks.ModelCheckpoint(str(args.output_model_path),
-                                                 monitor="val_loss",
-                                                 save_best_only=True)
-            ])
+  # USE FOR NORMALIZED BATCHES
+  # generator, steps = balanced_batch_generator(data["train"]["x"],
+                                              # data["train"]["damage_class"],
+                                              # batch_size=args.batch_size,
+                                              # sampler=RandomUnderSampler(replacement=False))
+  # model.fit_generator(
+      # generator,
+      # steps_per_epoch=steps,
+  # USE FOR REGULAR BATCHES
+  model.fit(
+      data["train"]["x"],
+      {"damage_class": data["train"]["damage_class"],
+       "damage_amount": data["train"]["damage_amount"]},
+      batch_size=args.batch_size,
+  # END FOR REGULAR BATCHES
+      epochs=args.epochs,
+      validation_data=(data["validation"]["x"],
+                       {"damage_class": data["validation"]["damage_class"],
+                        "damage_amount": data["validation"]["damage_amount"]}),
+      shuffle=True,
+      class_weight=class_weight,
+      callbacks=[
+        tf.keras.callbacks.EarlyStopping(monitor="val_loss",
+                                         patience=100),
+        tf.keras.callbacks.TerminateOnNaN(),
+        tf.keras.callbacks.ModelCheckpoint(str(args.model_out),
+                                           monitor="val_loss",
+                                           save_best_only=True)
+      ])
   # We use callback to save best
 

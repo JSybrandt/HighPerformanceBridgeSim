@@ -5,7 +5,7 @@ Time=0:dT:Length/Velocity; % Total time to cross bridge
 DataPoints=length(Time); % Number of Data points
 
 if RoughnessClassification==3
-    gd= (.001+rand(1,1)*(sqrt(32)-.001))*10^-6;
+    gd= (.001+rand(1,1)*(sqrt(16)-.001))*10^-6;
 elseif RoughnessClassification==4
     gd=128*10^-6;
 elseif RoughnessClassification==5
@@ -16,30 +16,27 @@ end
 
 SamplingInterval=dT;
 DeltaN=1/Length;
-SpatialFrequencyBand=DeltaN:DeltaN:(1/(SamplingInterval)); % Spatial Frequency Band
+SpatialFrequencyBand=0:DeltaN:(1/(SamplingInterval)); % Spatial Frequency Band
 PhaseAngle=2*pi*rand(1,DataPoints); % Random Phase Angle
 n0 = 0.1; % Spatial Frequency (cycles/m)
-xx = 0:SamplingInterval:Length-SamplingInterval; % Abscissa Variable from 0 to L 
+xx = 0:SamplingInterval:Length; % Abscissa Variable from 0 to L 
 GD=gd*(SpatialFrequencyBand./n0).^-2;
 d=sqrt(2*GD.*DeltaN);
+d(1)=0;
 rx = zeros(size(xx));
 drx = zeros(size(xx));
 ddrx = zeros(size(xx));
-for i=1:DataPoints-1
-rx(i)=sum(d.*cos(2*pi*SpatialFrequencyBand.*xx(i)+PhaseAngle(1:(DataPoints-1))));
-% drx(i)=sum(-SpatialFrequencyBand.*d.*sin(SpatialFrequencyBand.*xx(i)+PhaseAngle(1:(DataPoints-1))));
-% ddrx(i)=sum((-(SpatialFrequencyBand).^2).*d.*cos(SpatialFrequencyBand.*xx(i)+PhaseAngle(1:(DataPoints-1))));
+for i=1:DataPoints
+rx(i)=sum(d.*cos(2*pi*SpatialFrequencyBand.*xx(i)+PhaseAngle));
+drx(i)=sum(-2*pi*SpatialFrequencyBand.*d.*sin(2*pi*SpatialFrequencyBand.*xx(i)+PhaseAngle));
+ddrx(i)=sum((-(2*pi*SpatialFrequencyBand).^2).*d.*cos(2*pi*SpatialFrequencyBand.*xx(i)+PhaseAngle));
 end
-% 
-drx=diff(rx);
-drx(DataPoints-1)=drx(1);
-ddrx=diff(rx,2);
-ddrx(DataPoints-2:DataPoints-1)=ddrx(1:2);
-RoadMatrix=[round(xx,3); rx; drx; ddrx];
+
+RoadMatrix=[xx; rx; drx; ddrx];
 
 % figure(1)
 % set(gcf,'color','white')
-% plot(Time,drx,'color','k','Linewidth',2); hold on
+% plot(xx,rx,'color','k','Linewidth',2); hold on
 % xlabel('Distance Along Bridge (m)')
 % xlim([0 Length])
 % ylabel('Profile Height (m)')
@@ -47,8 +44,3 @@ RoadMatrix=[round(xx,3); rx; drx; ddrx];
 % legend ('Simulation 1', 'Simulation 2')
 % plotformat
 end
-
-
-
-
-

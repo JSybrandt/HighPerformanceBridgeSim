@@ -5,59 +5,94 @@ import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
 from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import random
+
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 def parse_args():
   parser = ArgumentParser()
-  parser.add_argument("input_pickle", type=Path)
-  parser.add_argument("input_model", type=Path)
+  parser.add_argument("--data", type=Path)
+  parser.add_argument("--model", type=Path)
+  parser.add_argument("--normalizer", type=Path)
+  parser.add_argument("--output_file", type=Path)
+  parser.add_argument("--splits", nargs="+", choices=["train", "validation", "test"], default=["train", "validation", "test"])
+  parser.add_argument("--subset", action="store_true")
+  parser.add_argument("--sequence_limit", type=int, default=100)
   return parser.parse_args()
 
 if __name__=="__main__":
   args = parse_args()
   print("Testing paths")
-  assert args.input_pickle.is_file()
-  assert args.input_pickle.suffix == ".pkl"
-  assert args.input_model.is_file()
-  assert args.input_model.suffix == ".h5"
-
-  print("Loading model")
-  model = tf.keras.models.load_model(str(args.input_model))
+  assert args.data.is_file()
+  assert args.data.suffix == ".pkl"
+  assert args.model.is_file()
+  assert args.model.suffix == ".h5"
+  assert args.normalizer.is_file()
+  assert args.normalizer.suffix == ".pkl"
+  assert args.output_file.suffix == ".txt"
 
   print("Loading data")
-  data = {split: {"x": [], "y":[]}
-          for split in ["train", "validation", "test"]}
-
-  # LOAD PICKLE
-  with open(args.input_pickle, 'rb') as pfile:
+  with open(args.data, 'rb') as pfile:
     raw_data = pickle.loads(pfile.read())
 
-  if "description" in raw_data:
-    print("Evaluating data:", raw_data["description"])
-
-  input_size = None
-  for split in data:
+  print("Loading data")
+  data = {}
+  for split in args.splits:
     assert split in raw_data
+    data[split] = {
+        "x": [],
+        "damage_class":[],
+        "damage_amount":[]
+      }
+    if args.subset:
+      random.shuffle(raw_data[split])
+      del raw_data[split][1000:]
     for pt in raw_data[split]:
-      if input_size is None:
-        input_size = len(pt["x"])
-      else:
-        assert len(pt["x"]) == input_size
-
       data[split]["x"].append(pt["x"])
-      data[split]["y"].append(pt["y"])
+      data[split]["damage_class"].append(pt["damage_class"])
+      data[split]["damage_amount"].append(pt["damage_amount"])
+    # Convert to np
+    data[split]["x"] = tf.keras.preprocessing.sequence.pad_sequences(
+        data[split]["x"], args.sequence_limit, dtype=float)
+    # To one-hot
+    data[split]["damage_class"] = tf.keras.utils.to_categorical(
+        data[split]["damage_class"])
+    # to np
+    data[split]["damage_amount"] = np.array(
+        data[split]["damage_amount"],
+        dtype=float).reshape(-1, 1)
 
-  del raw_data
+  print("Loading normalizers")
+  normalizers = joblib.load(str(args.normalizer))
+  feature_normalizer = normalizers["feature_normalizer"]
+  damage_amount_normalizer = normalizers["damage_amount_normalizer"]
 
-  for split in data:
-    data[split]["x"] = np.vstack(data[split]["x"])
-    predictions = model.predict(x=data[split]["x"], batch_size=128)
-    predictions = np.argmax(predictions, axis=1)
+  print("Normalizing")
+  for split in args.splits:
+    # Normalizing features
+    original_shape = data[split]["x"].shape
+    num_features = original_shape[-1]
+    data[split]["x"] = feature_normalizer.transform(
+        data[split]['x'].reshape(-1, num_features)
+    ).reshape(original_shape)
+    # Normalizing damage_amount
+    data[split]["damage_amount"] = damage_amount_normalizer.transform(
+        data[split]["damage_amount"])
 
-    accuracy = np.sum(predictions == data[split]["y"]) / len(data[split]["y"])
+  print("Loading model")
+  model = tf.keras.models.load_model(str(args.model))
 
+  with open(args.output_file, 'w') as o_file:
+    for split in data:
+      print(f"Evaluating {split}")
+      pred_damage_class, _ = model.predict(data[split]["x"],batch_size=128)
+      predicted_nums = np.argmax(pred_damage_class, axis=1)
+      target_nums = np.argmax(data[split]["damage_class"], axis=1)
+      accuracy = np.mean(predicted_nums == target_nums)
+      print("Acc:", accuracy)
+      report = classification_report(target_nums, predicted_nums)
 
-    report = classification_report(data[split]["y"], predictions)
-
-    print(split.upper())
-    print("Accuracy:", accuracy)
-    print(report)
+      o_file.write(f"{split.upper()}\n")
+      o_file.write(f"Accuracy: {accuracy}\n")
+      o_file.write(f"{report}\n")
