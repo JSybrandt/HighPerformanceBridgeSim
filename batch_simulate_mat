@@ -39,7 +39,7 @@ if [[ $FLAG == '--dry-run' ]]; then
 elif [[ -z $FLAG ]]; then
   echo "Simulating each day"
   parallel \
-    -linebuffer \
+    --linebuffer \
     --sshloginfile "$PBS_NODEFILE" \
     --workdir $PROJ_DIR \
     -j $JOBS_PER_NODE \

@@ -3,9 +3,9 @@ Day = str2num(DaySTR);
 load(inPath);
 
 % Record 4 - 9
-FFT_STEP = 0.05
-FFT_SELECT_START=floor(3/FFT_STEP)+1
-FFT_SELECT_END=floor(10/FFT_STEP)+1
+FFT_STEP = 0.05;
+FFT_SELECT_START=floor(3/FFT_STEP)+1;
+FFT_SELECT_END=floor(10/FFT_STEP)+1;
 
 hour = 0;
 for ii=1:n
