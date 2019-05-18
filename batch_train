@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MODEL_NAME=${1:-"lstm"}
+MODEL_NAME=${1:-"conv"}
 TARGET_DIR=${2:-"/scratch4/$USER/bridge_sim"}
 
 
@@ -23,18 +23,18 @@ TRAIN_BIN=$PROJ_DIR/code/ml_model/train_model
     --sshloginfile "$PBS_NODEFILE" \
     --workdir $PROJ_DIR \
     -j 1 \
-    --env EIGHT_CORE \
     """
     TRAINING_DATA={}/data.pkl
     MODEL_OUT={}/"$MODEL_NAME"_model.h5
     NORMALIZER_OUT={}/"$MODEL_NAME"_normalizer.pkl
+    DETAIL_CSV_OUT={}/"$MODEL_NAME"_training_details.csv
     if [[ -f \$TRAINING_DATA ]]; then
         source $CONDA_PREP_FILE
         source $MODULE_REF_FILE
         $TRAIN_BIN \$TRAINING_DATA \
           --model_out \$MODEL_OUT \
-          --normalizer_out \$NORMALIZER_OUT
-        #&>/dev/null
+          --normalizer_out \$NORMALIZER_OUT \
+          --training_detail_csv \$DETAIL_CSV_OUT
         echo {} Converged!
     else
       echo No training data found in {}

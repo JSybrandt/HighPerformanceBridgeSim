@@ -5,6 +5,7 @@ import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.externals import joblib
 from sklearn.utils.class_weight import compute_class_weight
 from imblearn.keras import balanced_batch_generator
@@ -18,30 +19,25 @@ def parse_args():
   parser.add_argument("--batch_size", type=int, default=128)
   parser.add_argument("--epochs", type=int, default=10000)
   parser.add_argument("--sequence_limit", type=int, default=140)
+  parser.add_argument("--training_detail_csv", type=Path)
   return parser.parse_args()
 
-def seq_model(seq_length, num_features, num_classes):
+def get_model(seq_length, num_features, num_classes):
   input_layer = tf.keras.layers.Input((seq_length, num_features))
-  hl = tf.keras.layers.Conv1D(16, 5,
-                              activation="relu",
-                              padding="causal")(input_layer)
-  hl = tf.keras.layers.Conv1D(16, 5,
-                              activation="relu",
-                              padding="causal")(hl)
+  hl = tf.keras.layers.Conv1D(16, 3,
+                              activation="relu")(input_layer)
+  hl = tf.keras.layers.Conv1D(16, 3,
+                              activation="relu")(hl)
   hl = tf.keras.layers.MaxPooling1D()(hl)
   hl = tf.keras.layers.Conv1D(32, 3,
-                              activation="relu",
-                              padding="causal")(hl)
+                              activation="relu")(hl)
   hl = tf.keras.layers.Conv1D(32, 3,
-                              activation="relu",
-                              padding="causal")(hl)
+                              activation="relu")(hl)
   hl = tf.keras.layers.MaxPooling1D()(hl)
   hl = tf.keras.layers.Conv1D(64, 3,
-                              activation="relu",
-                              padding="causal")(hl)
+                              activation="relu")(hl)
   hl = tf.keras.layers.Conv1D(64, 3,
-                              activation="relu",
-                              padding="causal")(hl)
+                              activation="relu")(hl)
   hl = tf.keras.layers.MaxPooling1D()(hl)
   hl = tf.keras.layers.Flatten()(hl)
   hl = tf.keras.layers.Dense(512, activation="relu")(hl)
@@ -94,7 +90,8 @@ if __name__=="__main__":
         data[split]["x"], args.sequence_limit, dtype=float)
     # To one-hot
     data[split]["damage_class"] = tf.keras.utils.to_categorical(
-        data[split]["damage_class"])
+        data[split]["damage_class"],
+        num_classes = 6)
     # to np
     data[split]["damage_amount"] = np.array(
         data[split]["damage_amount"],
@@ -102,7 +99,7 @@ if __name__=="__main__":
 
   print("Normalizing")
   num_features = data["train"]["x"].shape[2]
-  feature_normalizer = MinMaxScaler(copy=False)
+  feature_normalizer = StandardScaler(copy=False)
   damage_amount_normalizer = MinMaxScaler(copy=False)
   feature_normalizer.fit(data["train"]["x"].reshape(-1, num_features))
   damage_amount_normalizer.fit(data["train"]["damage_amount"])
@@ -120,23 +117,23 @@ if __name__=="__main__":
                "feature_normalizer": feature_normalizer},
                args.normalizer_out)
 
-  print("Getting class weights")
+  # print("Getting class weights")
   class_vals = data["train"]["damage_class"].argmax(axis=1)
   classes = np.unique(class_vals)
-  print(classes)
-  weights = compute_class_weight("balanced",
-                                       classes,
-                                       class_vals)
-  print(weights)
-  class_weight = {c:w for c, w in zip(classes,weights)}
-  print(class_weight)
+  # print(classes)
+  # weights = compute_class_weight("balanced",
+                                       # classes,
+                                       # class_vals)
+  # print(weights)
+  # class_weight = {c:w for c, w in zip(classes,weights)}
+  # print(class_weight)
 
   if args.model_out.is_file():
     print("Loading existing model.")
     model = tf.keras.models.load_model(str(args.model_out))
   else:
     print("Creating model.")
-    model = seq_model(args.sequence_limit, num_features, len(classes))
+    model = get_model(args.sequence_limit, num_features, 6)
     model.summary()
 
   model = tf.keras.utils.multi_gpu_model(model, 2)
@@ -146,6 +143,15 @@ if __name__=="__main__":
       metrics = ["accuracy"]
     )
 
+  callbacks = [tf.keras.callbacks.EarlyStopping(monitor="val_loss",
+                                                patience=10),
+               tf.keras.callbacks.TerminateOnNaN(),
+               tf.keras.callbacks.ModelCheckpoint(str(args.model_out),
+                                                  monitor="val_loss",
+                                                  save_best_only=True)]
+  if args.training_detail_csv is not None:
+    callbacks.append(tf.keras.callbacks.CSVLogger(str(args.training_detail_csv)))
+
   model.fit(
       data["train"]["x"],
       data["train"]["damage_class"],
@@ -154,14 +160,7 @@ if __name__=="__main__":
       validation_data=(data["validation"]["x"],
                        data["validation"]["damage_class"]),
       shuffle=True,
-      #class_weight=class_weight,
-      callbacks=[
-        tf.keras.callbacks.EarlyStopping(monitor="val_loss",
-                                         patience=100),
-        tf.keras.callbacks.TerminateOnNaN(),
-        tf.keras.callbacks.ModelCheckpoint(str(args.model_out),
-                                           monitor="val_loss",
-                                           save_best_only=True)
-      ])
+      callbacks=callbacks
+      )
   # We use callback to save best
 

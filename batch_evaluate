@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MODEL_NAME=${1:-"lstm"}
+MODEL_NAME=${1:-"conv"}
 TARGET_DIR=${2:-"/scratch4/$USER/bridge_sim"}
 
 if [[ ! -d $TARGET_DIR ]]; then
