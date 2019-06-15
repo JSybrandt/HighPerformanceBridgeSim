@@ -146,7 +146,7 @@ if __name__=="__main__":
   callbacks = [tf.keras.callbacks.EarlyStopping(monitor="val_loss",
                                                 patience=10),
                tf.keras.callbacks.TerminateOnNaN(),
-               tf.keras.callbacks.ModelCheckpoint(str(args.model_out),
+               tf.keras.callbacks.ModelCheckpoint(str(args.model_out)+"_ckpt",
                                                   monitor="val_loss",
                                                   save_best_only=True)]
   if args.training_detail_csv is not None:
@@ -163,4 +163,6 @@ if __name__=="__main__":
       callbacks=callbacks
       )
   # We use callback to save best
-
+  print("Saving Model...")
+  model.save(str(args.model_out))
+  print("Model Saved!")

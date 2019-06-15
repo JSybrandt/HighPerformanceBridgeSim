@@ -31,6 +31,8 @@ EVAL_BIN=$PROJ_DIR/code/ml_model/generate_confidence_plot
 
     source $CONDA_PREP_FILE
     source $MODULE_REF_FILE
+
+    echo $EVAL_BIN --data \$DATA_IN --model \$MODEL_IN --normalizer \$NORMALIZER_IN --output_file \$EVAL_REPORT_OUT
     $EVAL_BIN \
       --data \$DATA_IN \
       --model \$MODEL_IN \

@@ -24,13 +24,15 @@ def parse_args():
   parser.add_argument("--num_days", type=int, default=720)
   return parser.parse_args()
 
-def get_predictions_per_class(args, model, normalizer, x):
+def get_predictions_per_class(args, model, normalizer, x, day):
   original_shape = x.shape
   num_features = x.shape[2]
+  num_points = x.shape[0]
   x = normalizer.transform(x.reshape(-1, num_features)).reshape(original_shape)
-  predictions = model.predict(x, batch_size=128)
-  # booleans = np.zeros_like(predictions)
-  # booleans[np.arange(len(predictions)), booleans.argmax(axis=1)] = 1
+  batch_size = 128
+  while num_points % batch_size < 2:
+    batch_size += 1
+  predictions = model.predict(x, batch_size=batch_size)
   return np.sum(predictions, axis=0)
 
 def load_data_per_day(args):
@@ -183,13 +185,14 @@ if __name__=="__main__":
 
   print("Loading normalizer")
   normalizer = joblib.load(str(args.normalizer))["feature_normalizer"]
+  print("LOADING DONE!")
 
   day2correct = {d: v["damage_class"] for d, v in day2data.items()}
   print("Predicting each day.")
   day2pred_sum = {}
   for day, data in day2data.items():
     if len(data["x"]) > 0:
-      pred_sum = get_predictions_per_class(args, model, normalizer, data["x"])
+      pred_sum = get_predictions_per_class(args, model, normalizer, data["x"], day)
       day2pred_sum[day] = pred_sum
   # day2classcounts = {d: get_predictions_per_class(args, model, normalizer, v["x"], d)
                      # for d, v in day2data.items() if len(v["x"]) > 0}

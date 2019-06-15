@@ -2,13 +2,13 @@ function exitCode = SimulateDay(inPath, DaySTR, outPath)
 Day = str2num(DaySTR);
 load(inPath);
 
-% Record 4 - 9
+% Record 3-10
 FFT_STEP = 0.05;
 FFT_SELECT_START=floor(3/FFT_STEP)+1;
 FFT_SELECT_END=floor(10/FFT_STEP)+1;
 
-hour = 0;
-for ii=1:n
+hour=0; % Initial start of monitoring period
+for ii=1:n % This is the loop for changing vehicle variables over time
 
 % Temperature bounds
 if Temp==1
@@ -44,37 +44,43 @@ end
 
 % Applying damaged modulus to elemental matrix
 if Damage==1 && Damage_Case==1
-  if Day>=DayDamage1
-    if sum(ED1(1,1:(Day-DayDamage1+1)))/E >= .25
-      E_damaged1=E*.75;
-    else
-      E_damaged1=(E-sum(ED1(1,1:(Day-DayDamage1+1)))); % Overall Damaged Modulus 1
-    end
-    kb_damaged1=KBeam(E_damaged1*u0,I,l);
-  end
-elseif Damage==1 && Damage_Case==2
-
     if Day>=DayDamage5
-E_damaged1=E-ED1-ED2-ED3-ED4-ED5; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l);
+E_damaged=E-ED5; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
     elseif Day>=DayDamage4
-E_damaged1=E-ED1-ED2-ED3-ED4; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l);
+E_damaged=E-ED4; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
     elseif Day>=DayDamage3
-E_damaged1=E-ED1-ED2-ED3; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l);
+E_damaged=E-ED3; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
     elseif Day>=DayDamage2
-E_damaged1=E-ED1-ED2; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l);
+E_damaged=E-ED2; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
     elseif Day>=DayDamage1
-E_damaged1=E-ED1; % Overall Damaged Modulus 1
-kb_damaged1=KBeam(E_damaged1*u0,I,l);
+E_damaged=E-ED1; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
     end
+
+    elseif Damage==1 && Damage_Case==2
+E_damaged=E-ED; % Overall Damaged Modulus 1
+kb_damaged=KBeam(E_damaged*u0,I,l);
+    if Day>=DayDamage5
+D_Loc = NumberElements/2-4:1:NumberElements/2+5;
+    elseif Day>=DayDamage4
+D_Loc = NumberElements/2-3:1:NumberElements/2+4;
+    elseif Day>=DayDamage3
+D_Loc = NumberElements/2-2:1:NumberElements/2+3;
+    elseif Day>=DayDamage2
+D_Loc = NumberElements/2-1:1:NumberElements/2+2;
+    elseif Day>=DayDamage1
+D_Loc = [NumberElements/2,NumberElements/2+1];
+    end
+
 end
 
 % Healthy elemental matrices
 kb=KBeam(E0,I,l); % Stiffness matrix for bridge
-mb=MBeam(mu(1),l); % Consistent mass matrix for bridge
+mb=MBeam(mu,l); % Consistent mass matrix for bridge
 
 % Global Beam Matricies
 KB=zeros(2*(NumberElements+1),2*(NumberElements+1));
@@ -83,19 +89,16 @@ cor_Mon=zeros(NumberElements,4);
 for i=1:NumberElements
    cor_Mon(i,:)=ele(i,2:5);
    kk=KInsert(kb,cor_Mon(i,:),2*(NumberElements+1));
-   if Damage==1 && Damage_Case==1
-   if i==DamageLocation % Insert damage state 1
-       if Day>=DayDamage1
-   kk=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
-       end
-   end
+
+   if Damage==1 && Damage_Case==1 && i==DamageLocation
+           if Day>=DayDamage5 || Day>=DayDamage4 || Day>=DayDamage3 || Day>=DayDamage2 || Day>=DayDamage1
+   kk=KInsert(kb_damaged,cor_Mon(i,:),2*(NumberElements+1));
+           end
 
    elseif Damage==1 && Damage_Case==2
-       if i==DamageLocation
-           if Day>=DayDamage5 || Day>=DayDamage4 || Day>=DayDamage3 || Day>=DayDamage2 ||Day>=DayDamage1
-    kk=KInsert(kb_damaged1,cor_Mon(i,:),2*(NumberElements+1));
+           if (Day>=DayDamage5 || Day>=DayDamage4 || Day>=DayDamage3 || Day>=DayDamage2 || Day>=DayDamage1) && any(i==D_Loc)
+   kk=KInsert(kb_damaged,cor_Mon(i,:),2*(NumberElements+1));
            end
-       end
    end
 
  KB=KB+kk; % Beam stiffness matrix
@@ -106,11 +109,9 @@ end
 % Remove boundary conditions only so we can calculate damping matirx
 
 [M,K]=boundarycondition(MB,KB,NumberElements);
-% Encountered errors regarding bad eig values
 ei=eig(K,M); % eigenvalues
 ef=sort(real(sqrt(ei))); % sorted natural angular frequencies [rad/s]
 wn_FEA=ef; % sorted natural angular frequencies
-
 % Beam damping matrix
 al=2*bbeta*wn_FEA(1,1)*wn_FEA(2,1)/(wn_FEA(1,1)+wn_FEA(2,1)); % Alpha for Rayleigh Damping
 be=2*bbeta/(wn_FEA(1,1)+wn_FEA(2,1)); % Beta for Rayleigh Damping
@@ -346,30 +347,6 @@ end
 xg=xg+dT*V(Day,ii,1);
 end % end single vehicle loop
 
-% Adding noise to the acceleration of upper vehicle
-% za_u=za_u+(za_u*(-.025))+randn(2,1).*(za_u*(.025)-za_u*(-.025));
-
-% figure(4)
-% set(gcf,'color','white')
-% plot(T,za_u(1,:),'linewidth',3);hold on
-% title('Acceleration of Upper Vehicle')
-% set(gca,'fontsize',16);
-% xlabel('Time (s) ');
-% ylabel('Displacement (m)');
-% % legend('11.11','22.22','33.33','44.44','location','northwest')
-% plotformat
-%
-% figure(5)
-% set(gcf,'color','white')
-% plot(T,za_u(2,:),'linewidth',3);hold on
-% title('Acceleration of Upper Vehicle')
-% set(gca,'fontsize',16);
-% xlabel('Time (s) ');
-% ylabel('Displacement (m)');
-% % legend('11.11','22.22','33.33','44.44','location','northwest')
-% plotformat
-
-
 % Shifting acceleration data out of time domain and into frequency domain
 Fs = 1/dT; % Sampling frequency
 nFFT = Fs/FFT_STEP;
@@ -387,7 +364,7 @@ onesided_FE_Original(:,2:end-1) = 2*onesided_FE_Original(:,2:end-1); % Scale Pow
 
 % Apply Filters
 % Bandpass
-%fpass=[4 9];
+%fpass=[3 10];
 %Filt_BF = bandpass(za_u',fpass,Fs,'Steepness',.99);
 %fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
 %onesided_FE_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
@@ -397,9 +374,9 @@ onesided_FE_Original(:,2:end-1) = 2*onesided_FE_Original(:,2:end-1); % Scale Pow
 % % learning)
 Monitor_Vehicle_Time{Day,ii}=T;
 Monitor_Vehicle_Acceleration{Day,ii}=za_u;
-Monitor_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Original(:, FFT_SELECT_START:FFT_SELECT_END);
+Monitor_Vehicle_Frequency_Amp_Data.Original{Day,ii}=onesided_FE_Original(:, FFT_SELECT_START:FFT_SELECT_END);;
 %Monitor_Vehicle_Frequency_Amp_Data.Filtered{Day,ii}=onesided_FE_BF;
-Monitor_Vehicle_Frequency_Data{Day,ii}=f(FFT_SELECT_START:FFT_SELECT_END); % only store band
+Monitor_Vehicle_Frequency_Data{Day,ii}=f(FFT_SELECT_START:FFT_SELECT_END);
 
 %% End of first section of "If Multiple_Vehicle" loop
 
@@ -784,14 +761,14 @@ ac_Sec=Nc_Sec*ab_Sec+2*V(Day,ii,2)*Ncd_Sec*vb_Sec+(V(Day,ii,2)^2)*Ncdd_Sec*db_Se
 
 if Surface==1
 % Future displacement, velocity and acceleration in lower vehicle
-zw_Mon(:,i+1)=dc_Mon+rx_Mon; % Future displacement
-zv_w_Mon(:,i+1)=vc_Mon+V(Day,ii,2)*drx_Mon; % Future Velocity
-za_w_Mon(:,i+1)=ac_Mon+V(Day,ii,2)^2*ddrx_Mon; % Future Acceleration
+zw_Mon(:,i+1)=dc_Mon+rx; % Future displacement
+zv_w_Mon(:,i+1)=vc_Mon+V(Day,ii,2)*drx; % Future Velocity
+za_w_Mon(:,i+1)=ac_Mon+V(Day,ii,2)^2*ddrx; % Future Acceleration
 
 % Future displacement, velocity and acceleration in lower vehicle
-zw_Sec(:,i+1)=dc_Sec+rx_Sec; % Future displacement
-zv_w_Sec(:,i+1)=vc_Sec+V(Day,ii,2)*drx_Sec; % Future Velocity
-za_w_Sec(:,i+1)=ac_Sec+V(Day,ii,2)^2*ddrx_Sec; % Future Acceleration
+zw_Sec(:,i+1)=dc_Sec+rx; % Future displacement
+zv_w_Sec(:,i+1)=vc_Sec+V(Day,ii,2)*drx; % Future Velocity
+za_w_Sec(:,i+1)=ac_Sec+V(Day,ii,2)^2*ddrx; % Future Acceleration
 else
 % Future displacement, velocity and acceleration in lower vehicle
 zw_Mon(:,i+1)=dc_Mon; % Future displacement
@@ -927,27 +904,6 @@ za_u_Sec(:,Kt_Sec+1:end)=[];
 
 end
 
-% Test matrix for debugging
-% Matrix1=[Kt_Mon, Kt_Sec; length(rx_Mon), length(rx_Sec); length(za_Mon), length(za_Sec)]
-%  Matrix2=[rx_Mon(1), rx_Mon(end); rx_Sec(1), rx_Sec(end)]
-
-% Acceleration plots after excess data has been trimmed off of the ends
-% figure(3)
-% set(gcf,'color','white')
-% plot(0:dT:L/V(Day,ii,2),za_u_Sec(1,:),'b','linewidth',3);hold on
-% title('Monitoring Vehicle Acceleration')
-% xlabel('Time (s) ');
-% ylabel('Acceleration (m)');
-% plotformat
-% %
-% figure(4)
-% set(gcf,'color','white')
-% plot(0:dT:L/V(Day,ii,1),za_u_Mon(1,:),'b','linewidth',3);hold on
-% title('Monitoring Vehicle Acceleration')
-% xlabel('Time (s) ');
-% ylabel('Acceleration (m)');
-% plotformat
-
 % Shifting acceleration data out of time domain and into frequency domain
 Fs = 1/dT; % Sampling frequency
 nFFT = Fs/FFT_STEP;
@@ -968,7 +924,7 @@ onesided_FE_Sec_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 
 % Apply Filters
 % Bandpass
-%fpass=[4 9];
+%fpass=[3 10];
 %Filt_BF = bandpass(za_u_Mon',fpass,Fs,'Steepness',.99);
 %fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
 %onesided_FE_Mon_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
@@ -976,21 +932,6 @@ onesided_FE_Sec_Original = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
 %Filt_BF = bandpass(za_u_Sec',fpass,Fs,'Steepness',.99);
 %fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
 %onesided_FE_Sec_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
-
-% figure(6)
-% subplot(2,1,1)
-% plot(f,onesided_FE_Mon_BF(1,:),'LineWidth',2); hold on
-% title('Frequency Response of Body (No Filt)')
-% xlabel('Frequency (Hz)','Fontname','Timesnewroman')
-% xlim([0 25])
-% plotformat
-% subplot(2,1,2)
-% plot(f,onesided_FE_Mon_BF(2,:),'LineWidth',2); hold on
-% title('Frequency Response of Front Wheel (No Filt)')
-% xlabel('Frequency (Hz)','Fontname','Timesnewroman')
-% xlim([0 25])
-% plotformat
-
 
 % Storage matrices and cell arrays (used to store information for machine learning)
 Monitor_Vehicle_Time{Day,ii}=T_Mon;
@@ -1241,7 +1182,7 @@ if rem(nFFT,2)>0
 end
 f = Fs*(0:(nFFT/2))/(nFFT); % Frequency domain
 
-za_u = lowpass(za_u',100,Fs,'Steepness',.99)';
+% za_u = lowpass(za_u',100,Fs,'Steepness',.99)';
 
 % Executing FFt for Upper Vehicle
 fft_V=abs(fft(za_u,nFFT,2)/nFFT);
@@ -1250,7 +1191,7 @@ onesided_FE_Original(:,2:end-1) = 2*onesided_FE_Original(:,2:end-1); % Scale Pow
 
 % Apply Filters
 % Bandpass
-%fpass=[4 9];
+%fpass=[3 10];
 %Filt_BF = bandpass(za_u',fpass,Fs,'Steepness',.99);
 %fft_V = abs(fft(Filt_BF',nFFT,2)/nFFT);
 %onesided_FE_BF = fft_V(:,1:nFFT/2+1); % Single-sided spectrum
