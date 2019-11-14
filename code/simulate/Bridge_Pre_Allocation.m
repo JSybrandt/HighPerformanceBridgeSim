@@ -77,11 +77,19 @@ DayDamage2=round(lim*.33,0); % The day second damage is iniciated on bridge
 DayDamage3=round(lim*.5,0); % The day damage is iniciated on bridge
 DayDamage4=round(lim*.66,0); % The day damage is iniciated on bridge
 DayDamage5=round(lim*.75,0); % The day damage is iniciated on bridge
-ED1=(.169*E); % Damaged Modulus 1
-ED2=(.292*E); % Damaged Modulus 2
-ED3=(.386*E); % Damaged Modulus 3
-ED4=(.46*E); % Damaged Modulus 4
-ED5=(.496*E); % Damaged Modulus 5
+% Experiment 1
+%ED1=(.169*E); % Damaged Modulus 1
+%ED2=(.292*E); % Damaged Modulus 2
+%ED3=(.386*E); % Damaged Modulus 3
+%ED4=(.46*E); % Damaged Modulus 4
+%ED5=(.496*E); % Damaged Modulus 5
+% Experiment 2
+ED1=(.097*E); % Damaged Modulus 1
+ED2=(.17*E); % Damaged Modulus 2   
+ED3=(.245*E); % Damaged Modulus 3
+ED4=(.293*E); % Damaged Modulus 4 
+ED5=(.354*E); % Damaged Modulus 5  
+
 
 elseif Damage==1 && Damage_Case==2
 DayDamage1=round(lim*.25,0); % The day damage is iniciated on bridge
